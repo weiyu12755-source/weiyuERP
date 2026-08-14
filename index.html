@@ -1227,7 +1227,7 @@
     function updateSalesSelectedCount(){const el=document.getElementById('salesSelectedCount');if(el)el.textContent=`已勾選 ${selectedSalesIds.size} 筆`;const all=document.getElementById('selectAllSales');if(all){const list=filteredSalesList();all.checked=!!list.length&&list.every(r=>selectedSalesIds.has(r.id));all.indeterminate=list.some(r=>selectedSalesIds.has(r.id))&&!all.checked}}
     function selectedSalesList(){return salesRecords.map(normalizeSale).filter(r=>selectedSalesIds.has(r.id))}
     function previewSingleSaleReport(id){const raw=salesRecords.find(x=>x.id===id);if(!raw)return alert('找不到這筆銷售資料。');document.getElementById('salesReportContent').innerHTML=buildSalesReport([normalizeSale(raw)]);document.getElementById('salesReportModal').classList.add('open')}
-    function salesPrintCss(){return `@page{size:A4 portrait;margin:10mm}*{box-sizing:border-box}body{font-family:'Noto Sans TC',sans-serif;margin:0;background:#fff;color:#16181b}.sales-official-page{width:190mm!important;max-width:190mm!important;margin:0 auto!important;padding:8mm!important;box-shadow:none!important;font-size:11px!important;page-break-after:always;break-after:page}.sales-official-page:last-child{page-break-after:auto;break-after:auto}.report-header{text-align:center;border-bottom:3px solid #8f1117;padding-bottom:12px;margin-bottom:14px}.report-header h1{font-size:23px;margin:0 0 4px;letter-spacing:.14em}.report-header p{margin:0;color:#666}.report-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px}.report-meta div{border:1px solid #d8dce1;padding:7px}.report-meta small{display:block;color:#777;margin-bottom:2px}.report-section{margin-top:11px;break-inside:avoid;page-break-inside:avoid}.report-section h3{margin:0;padding:6px 9px;background:#272b30;color:#fff;font-size:13px}.report-table{width:100%;border-collapse:collapse}.report-table th,.report-table td{border:1px solid #d8dce1;padding:5px 7px;vertical-align:middle}.report-table th{width:22%;background:#f5f6f7;color:#444}.report-table td{width:28%;word-break:break-word}.report-total th,.report-total td{font-weight:800;color:#b52228;background:#fff3f3}.report-footer{margin-top:14px;display:flex;justify-content:space-between;color:#666;font-size:10px}`}
+    function salesPrintCss(){return `@page{size:A4 portrait;margin:10mm}*{box-sizing:border-box}body{font-family:'Noto Sans TC',sans-serif;margin:0;background:#fff;color:#16181b}.sales-official-page{width:190mm!important;max-width:190mm!important;margin:0 auto!important;padding:8mm!important;box-shadow:none!important;font-size:11px!important;page-break-after:always;break-after:page}.sales-official-page:last-child{page-break-after:auto;break-after:auto}.report-header{text-align:center;border-bottom:3px solid #8f1117;padding-bottom:12px;margin-bottom:14px}.report-header h1{font-size:23px;margin:0 0 4px;letter-spacing:.14em}.report-header p{margin:0;color:#666}.report-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px}.report-meta div{border:1px solid #d8dce1;padding:7px}.report-meta small{display:block;color:#777;margin-bottom:2px}.report-section{margin-top:11px;break-inside:avoid!important;page-break-inside:avoid!important}.report-section h3{break-after:avoid!important;page-break-after:avoid!important}.report-section h3{margin:0;padding:6px 9px;background:#272b30;color:#fff;font-size:13px}.report-table{width:100%;border-collapse:collapse}.report-table th,.report-table td{border:1px solid #d8dce1;padding:5px 7px;vertical-align:middle}.report-table th{width:22%;background:#f5f6f7;color:#444}.report-table td{width:28%;word-break:break-word}.report-total th,.report-total td{font-weight:800;color:#b52228;background:#fff3f3}.report-footer{margin-top:14px;display:flex;justify-content:space-between;color:#666;font-size:10px}`}
     function openSalesPrintWindow(list,title='銷售與收款報表'){
       if(!list.length)return alert('目前沒有可列印的銷售資料。');
       const win=window.open('','_blank');if(!win)return alert('瀏覽器阻擋了列印視窗，請允許彈出式視窗後再試。');
@@ -1239,13 +1239,35 @@
       const rect=pageEl.getBoundingClientRect();
       const canvas=await html2canvas(pageEl,{scale:2,useCORS:true,allowTaint:false,backgroundColor:'#fff',scrollX:0,scrollY:0,windowWidth:Math.ceil(rect.width),windowHeight:Math.ceil(pageEl.scrollHeight),logging:false});
       const pageW=210,pageH=297,margin=8,printW=pageW-margin*2,printH=pageH-margin*2,pxPerMm=canvas.width/printW,pagePxH=Math.floor(printH*pxPerMm);
+      const scaleY=canvas.height/Math.max(1,rect.height);
+
+      // 只允許在完整區塊之間分頁，避免「備註」標題在上一頁、內容被切到下一頁。
+      const safeBreaks=new Set([0,canvas.height]);
+      pageEl.querySelectorAll('.report-header,.report-meta,.report-section,.report-footer').forEach(el=>{
+        const r=el.getBoundingClientRect();
+        const bottom=Math.round((r.bottom-rect.top)*scaleY);
+        if(bottom>0&&bottom<canvas.height)safeBreaks.add(bottom);
+      });
+      const breaks=[...safeBreaks].sort((a,b)=>a-b);
+      const minFill=Math.floor(pagePxH*0.48);
+
+      function chooseEnd(start){
+        const target=Math.min(start+pagePxH,canvas.height);
+        if(target>=canvas.height)return canvas.height;
+        const candidates=breaks.filter(v=>v>start+minFill&&v<=target-4);
+        if(candidates.length)return candidates[candidates.length-1];
+        return target;
+      }
+
       let y=0;
       while(y<canvas.height){
-        const sliceH=Math.min(pagePxH,canvas.height-y);
+        let end=chooseEnd(y);
+        if(end<=y)end=Math.min(y+pagePxH,canvas.height);
+        const sliceH=end-y;
         const pc=document.createElement('canvas');pc.width=canvas.width;pc.height=sliceH;const ctx=pc.getContext('2d',{alpha:false});ctx.fillStyle='#fff';ctx.fillRect(0,0,pc.width,pc.height);ctx.drawImage(canvas,0,y,canvas.width,sliceH,0,0,canvas.width,sliceH);
         if(!isFirstRef.first)pdf.addPage('a4','p');isFirstRef.first=false;
         pdf.addImage(pc.toDataURL('image/png'),'PNG',margin,margin,printW,sliceH/pxPerMm,undefined,'FAST');
-        y+=sliceH;
+        y=end;
       }
     }
     async function createSalesPdfForList(list,filename){
