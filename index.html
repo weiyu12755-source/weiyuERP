@@ -179,6 +179,23 @@
     .roc-date-group input,.roc-date-group select{width:100%;min-width:0;padding:13px 10px;border:1px solid var(--line);border-radius:12px;background:#fff}
     .roc-date-group span{color:var(--muted);font-size:13px}
     @media(max-width:480px){.roc-date-group{grid-template-columns:minmax(62px,1fr) auto minmax(62px,1fr) auto minmax(62px,1fr) auto;gap:4px}.roc-date-group input,.roc-date-group select{padding:11px 7px}}
+
+    /* ===== 桌機版左側欄背景延伸修正：不變更既有功能 =====
+       側欄本身仍維持 sticky 100vh，但由 .app 補上同色背景，
+       當右側內容高度超過一個畫面時，左側下方不會出現空白。 */
+    @media(min-width:901px){
+      .app{
+        background:
+          linear-gradient(
+            to right,
+            #141619 0,
+            #141619 250px,
+            var(--bg) 250px,
+            var(--bg) 100%
+          );
+      }
+    }
+
 </style>
 </head>
 <body>
