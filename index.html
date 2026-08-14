@@ -1174,11 +1174,11 @@
         const n=normalizeSale(r),date=r.deliveryDate||r.fundingDate||r.orderDate;
         const saleSummary=`${n.vehicle?.plate||''} ${n.vehicle?.brand||''} ${n.vehicle?.model||''}／${r.customerName||''}`.trim();
         const profit=Number(n.companyProfit||0);
-        if(profit!==0) rows.push({id:`sale_profit_${r.id}`,date,no:r.id,type:'收入',account:'銷售淨利收入',source:'銷售與收款',summary:saleSummary,income:profit,expense:0,handler:n.employee?.name||'',note:`車輛毛利 ${money(n.profit||0)}－業務獎金 ${money(n.commission||0)}－上線分潤 ${money(n.managerCommission||0)}＝公司銷售淨利 ${money(profit)}`,editable:false});
+        if(profit!==0) rows.push({id:`sale_profit_${r.id}`,date,no:r.id,type:'收入',account:'銷售淨利收入',source:'銷售與收款',summary:saleSummary,income:profit,expense:0,handler:n.employee?.name||'',note:`車輛毛利 ${money(n.profit||0)}－業務獎金 ${money(n.commission||0)}－直屬分潤 ${money(n.managerCommission||0)}＝公司銷售淨利 ${money(profit)}`,editable:false});
       });
       payrollRecords.filter(r=>r.status==='已確認').forEach(r=>{
         const autoSaleCommission=(r.commissionItems||[]).filter(x=>x.saleId).reduce((s,x)=>s+Number(x.cancelDeposit||0)+Number(x.loanCommission||0)+Number(x.salesCommission||0)+Number(x.purchaseBonus||0),0),salaryExpense=Math.max(0,Number(r.net||0)-autoSaleCommission);
-        if(salaryExpense>0) rows.push({id:`payroll_${r.id}`,date:(r.month||'')+'-10',no:r.id,type:'支出',account:'實發薪資',source:'薪資管理',summary:`${r.employeeName||''} ${r.month||''} 實發薪資（排除已於銷售淨利扣除之分潤）`,income:0,expense:salaryExpense,handler:r.employeeName||'',note:[r.note,autoSaleCommission>0?`已排除銷售單自動佣金／上線分潤 ${money(autoSaleCommission)}，避免會計重複扣除`:'' ].filter(Boolean).join('／'),editable:false});
+        if(salaryExpense>0) rows.push({id:`payroll_${r.id}`,date:(r.month||'')+'-10',no:r.id,type:'支出',account:'實發薪資',source:'薪資管理',summary:`${r.employeeName||''} ${r.month||''} 實發薪資（排除已於銷售淨利扣除之分潤）`,income:0,expense:salaryExpense,handler:r.employeeName||'',note:[r.note,autoSaleCommission>0?`已排除銷售單自動佣金／直屬分潤 ${money(autoSaleCommission)}，避免會計重複扣除`:'' ].filter(Boolean).join('／'),editable:false});
       });
       miscExpenses.forEach(r=>rows.push({id:r.id,date:r.date,no:r.no,type:'支出',account:'雜支開銷',source:'雜支開銷',summary:`${r.category||'其他'}－${r.summary||''}`,income:0,expense:Number(r.amount||0),handler:r.handler||'',note:[r.payment,r.note].filter(Boolean).join('／'),editable:true}));
       return rows.sort((a,b)=>String(b.date).localeCompare(String(a.date)));
@@ -1188,7 +1188,7 @@
       const salesProfit=allMonthRows.filter(r=>r.account==='銷售淨利收入').reduce((s,r)=>s+Number(r.income||0),0);
       const salary=allMonthRows.filter(r=>r.account==='實發薪資').reduce((s,r)=>s+Number(r.expense||0),0);
       const misc=allMonthRows.filter(r=>r.account==='雜支開銷').reduce((s,r)=>s+Number(r.expense||0),0);
-      const items=[['銷售淨利收入',salesProfit,'車輛毛利扣除業務佣金與上線分潤後的公司銷售淨利'],['實發薪資',-salary,'已排除銷售單已先扣除的自動佣金／上線分潤，避免重複扣款'],['雜支開銷',-misc,'租金、水電及其他營業費用']];
+      const items=[['銷售淨利收入',salesProfit,'車輛毛利扣除業務佣金與直屬分潤後的公司銷售淨利'],['實發薪資',-salary,'已排除銷售單已先扣除的自動佣金／直屬分潤，避免重複扣款'],['雜支開銷',-misc,'租金、水電及其他營業費用']];
       document.getElementById('accountingMonthTitle').textContent=`${month||'全部月份'} 收支總覽`;
       document.getElementById('accountingBreakdown').innerHTML=items.map(([label,value,note])=>`<div class="accounting-breakdown-item"><small>${label}</small><b class="${value>=0?'accounting-income':'accounting-expense'}">${money(value)}</b><div style="font-size:11px;color:var(--muted);margin-top:5px">${note}</div></div>`).join('');
     }
