@@ -285,7 +285,7 @@
         </section>
         <section id="employees" class="page">
           <div class="card full-card">
-            <div class="section-head"><div><h3>員工管理</h3><p>基本身分、聯絡資料、職務資料與薪資投保</p></div><button class="btn btn-primary" onclick="openEmployeeModal()">＋ 新增員工</button></div>
+            <div class="section-head"><div><h3>員工管理</h3><p>基本身分、聯絡資料、職務資料與薪資投保</p></div><div class="action-group"><button class="btn btn-light" onclick="openEmployeeTitleManager()">管理職稱</button><button class="btn btn-primary" onclick="openEmployeeModal()">＋ 新增員工</button></div></div>
             <div class="employee-kpis"><div><small>員工總數</small><b id="employeeTotal">0</b></div><div><small>在職</small><b id="employeeActive">0</b></div><div><small>留職停薪</small><b id="employeeLeave">0</b></div><div><small>離職</small><b id="employeeInactive">0</b></div></div>
             <div class="toolbar"><input id="employeeSearch" placeholder="搜尋姓名、職稱、手機" oninput="renderEmployees()"><select id="employeeStatusFilter" onchange="renderEmployees()"><option value="">全部狀態</option><option>在職</option><option>留職停薪</option><option>離職</option></select><select id="employeeTypeFilter" onchange="renderEmployees()"><option value="">全部工作性質</option><option>全職</option><option>兼職</option><option>實習</option></select></div>
             <div class="table-wrap"><table><thead><tr><th>員工</th><th>職稱</th><th>聯絡方式</th><th>到職日</th><th>工作性質</th><th>在職狀態</th><th>操作</th></tr></thead><tbody id="employeeTableBody"></tbody></table></div>
@@ -329,11 +329,13 @@
 
 
 
+  <div id="employeeTitleManagerModal" class="modal"><div class="modal-box" style="width:min(620px,96vw)"><div class="modal-head"><h3 style="margin:0">員工職稱管理</h3><button class="btn btn-light" onclick="closeEmployeeTitleManager()">關閉</button></div><div class="modal-body"><div class="field"><label>新增職稱</label><div style="display:flex;gap:8px"><input id="newEmployeeTitle" placeholder="例如：副店長、行政助理"><button class="btn btn-primary" onclick="addEmployeeTitle()">新增</button></div></div><div id="employeeTitleManagerList" class="manager-list"></div><p style="margin:12px 0 0;color:var(--muted);font-size:12px;line-height:1.7">編輯職稱會同步更新目前員工資料；刪除職稱只會從可選清單移除，不會清除既有員工已保存的職稱。</p></div></div></div>
+
   <div id="employeeModal" class="modal"><div class="modal-box employee-modal-box"><div class="modal-head"><h3 id="employeeModalTitle" style="margin:0">新增員工</h3><button class="btn btn-light" onclick="closeEmployeeModal()">關閉</button></div><div class="modal-body">
     <div class="employee-tabs"><button class="employee-tab active" onclick="switchEmployeeTab('basic',this)">基本身分</button><button class="employee-tab" onclick="switchEmployeeTab('contact',this)">聯絡與緊急通報</button><button class="employee-tab" onclick="switchEmployeeTab('job',this)">職務資料</button><button class="employee-tab" onclick="switchEmployeeTab('salary',this)">薪資與投保</button></div>
     <div id="employeePaneBasic" class="employee-pane active"><div class="form-grid"><div class="field"><label>真實姓名 *</label><input id="empName"></div><div class="field"><label>身分證字號／護照號碼 *</label><input id="empIdNumber"></div><div class="field"><label>出生年月日（民國） *</label><div class="roc-date-group"><input id="empBirthDateRocYear" type="number" min="1" max="200" placeholder="年"><span>年</span><select id="empBirthDateMonth"></select><span>月</span><select id="empBirthDateDay"></select><span>日</span></div><input id="empBirthDate" type="hidden"></div><div class="field"><label>性別</label><select id="empGender"><option value="">請選擇</option><option>女性</option><option>男性</option></select></div></div></div>
     <div id="employeePaneContact" class="employee-pane"><div class="form-grid"><div class="field"><label>手機號碼</label><input id="empMobile"></div><div class="field"><label>市話</label><input id="empPhone"></div><div class="field"><label>個人電子信箱</label><input id="empEmail" type="email"></div><div class="field"><label>緊急聯絡人姓名</label><input id="empEmergencyName"></div><div class="field"><label>關係</label><input id="empEmergencyRelation"></div><div class="field"><label>緊急聯絡電話</label><input id="empEmergencyPhone"></div><div class="field span-3"><label class="consent-check"><input id="empEmergencyConsent" type="checkbox">已確認緊急聯絡人同意提供其姓名、關係與電話供緊急通報使用</label></div><div class="field span-3"><label>通訊地址</label><input id="empMailingAddress"></div><div class="field span-3"><label>戶籍地址</label><input id="empRegisteredAddress"></div></div></div>
-    <div id="employeePaneJob" class="employee-pane"><div class="form-grid"><div class="field"><label>到職日 *</label><input id="empHireDate" type="date"></div><div class="field"><label>離職日</label><input id="empTerminationDate" type="date"></div><div class="field"><label>在職狀態</label><select id="empStatus"><option>在職</option><option>留職停薪</option><option>離職</option></select></div><div class="field"><label>職稱</label><select id="empTitle"><option value="">請選擇</option><option>店長</option><option>助理</option><option>業務</option><option>內勤</option><option>會計</option></select></div><div class="field"><label>工作性質</label><select id="empWorkType"><option>全職</option><option>兼職</option><option>實習</option></select></div><div class="field"><label>直屬主管</label><input id="empManager"></div></div></div>
+    <div id="employeePaneJob" class="employee-pane"><div class="form-grid"><div class="field"><label>到職日 *</label><input id="empHireDate" type="date"></div><div class="field"><label>離職日</label><input id="empTerminationDate" type="date"></div><div class="field"><label>在職狀態</label><select id="empStatus"><option>在職</option><option>留職停薪</option><option>離職</option></select></div><div class="field"><label>職稱</label><select id="empTitle"><option value="">請選擇</option></select></div><div class="field"><label>工作性質</label><select id="empWorkType"><option>全職</option><option>兼職</option><option>實習</option></select></div><div class="field"><label>直屬主管</label><input id="empManager"></div></div></div>
     <div id="employeePaneSalary" class="employee-pane"><div class="form-grid"><div class="subsection-title">銀行帳戶</div><div class="field"><label>銀行代碼</label><input id="empBankCode"></div><div class="field"><label>分行代碼</label><input id="empBranchCode"></div><div class="field"><label>戶名</label><input id="empBankHolder"></div><div class="field span-2"><label>銀行帳號</label><input id="empBankAccount"></div><div class="subsection-title">投保級距</div><div class="field"><label>勞保投保薪資</label><input id="empLaborInsurance" type="number" min="0"></div><div class="field"><label>健保投保薪資</label><input id="empHealthInsurance" type="number" min="0"></div><div class="field"><label>勞退提繳工資</label><input id="empPensionSalary" type="number" min="0"></div><div class="field"><label>勞退自提比例（%）</label><input id="empPensionSelfRate" type="number" min="0" max="6" step="1"></div><div class="subsection-title">薪資結構</div><div class="field"><label>本薪</label><input id="empBaseSalary" type="number" min="0"></div><div class="field"><label>職務津貼</label><input id="empPositionAllowance" type="number" min="0"></div><div class="field"><label>全勤獎金</label><input id="empAttendanceBonus" type="number" min="0"></div><div class="field"><label>其他經常性給與</label><input id="empOtherAllowance" type="number" min="0"></div><div class="field"><label>銷售毛利抽成比例（%）</label><input id="empSalesCommissionRate" type="number" min="0" max="100" step="0.1" value="30"></div></div></div>
   </div><div class="modal-actions"><button class="btn btn-danger" id="employeeDeleteBtn" style="margin-right:auto;display:none" onclick="deleteCurrentEmployee()">刪除員工</button><button class="btn btn-light" id="employeeCancelBtn" onclick="closeEmployeeModal()">取消</button><button class="btn btn-primary" id="employeeSaveBtn" onclick="saveEmployee()">儲存員工</button></div></div></div>
 
@@ -479,6 +481,7 @@
       vehicles:'[]',
       vehicleCostCategories:JSON.stringify(defaultCostCategories),
       weiyuEmployeesV1:'[]',
+      weiyuEmployeeTitlesV1:JSON.stringify(['店長','助理','業務','內勤','會計']),
       erpCompanyNameV1:'威宇國際車業',
       erpLoginUsersV1:'[]',
       weiyuPayrollV1:'[]',
@@ -486,7 +489,7 @@
       weiyuInventoryTradesV2:'[]',
       weiyuMiscExpensesV1:'[]'
     };
-    const APP_DATA_KEYS=['vehicleBrandModels','vehicles','vehicleCostCategories','weiyuEmployeesV1','erpCompanyNameV1','erpLoginUsersV1','weiyuPayrollV1','weiyuSalesV1','weiyuInventoryTradesV2','weiyuMiscExpensesV1'];
+    const APP_DATA_KEYS=['vehicleBrandModels','vehicles','vehicleCostCategories','weiyuEmployeesV1','weiyuEmployeeTitlesV1','erpCompanyNameV1','erpLoginUsersV1','weiyuPayrollV1','weiyuSalesV1','weiyuInventoryTradesV2','weiyuMiscExpensesV1'];
 
     const SHARED_STATE_ID='weiyu_erp_shared';
     let cloudReady=false;
@@ -506,6 +509,10 @@
       ['weiyuEmployeesV1','erpLoginUsersV1','weiyuPayrollV1','weiyuSalesV1','weiyuInventoryTradesV2','weiyuMiscExpensesV1'].forEach(k=>{
         try{const value=JSON.parse(clean[k]||'[]');clean[k]=JSON.stringify(Array.isArray(value)?value:[])}catch(_error){clean[k]='[]'}
       });
+      try{
+        const titles=JSON.parse(clean.weiyuEmployeeTitlesV1||'[]');
+        clean.weiyuEmployeeTitlesV1=JSON.stringify(Array.isArray(titles)?titles.filter(Boolean):['店長','助理','業務','內勤','會計']);
+      }catch(_error){clean.weiyuEmployeeTitlesV1=JSON.stringify(['店長','助理','業務','內勤','會計'])}
       return clean;
     }
     function applyRemoteAppState(state){
@@ -609,6 +616,8 @@
       try{vehicles=(JSON.parse(localStorage.getItem('vehicles')||'[]')||[]).map((v,i)=>normalizeVehicle(v,i))}catch(_e){vehicles=[]}
       try{costCategories=JSON.parse(localStorage.getItem('vehicleCostCategories')||'null')||[...defaultCostCategories]}catch(_e){costCategories=[...defaultCostCategories]}
       try{employees=JSON.parse(localStorage.getItem('weiyuEmployeesV1')||'[]')||[]}catch(_e){employees=[]}
+      try{employeeTitles=JSON.parse(localStorage.getItem('weiyuEmployeeTitlesV1')||'null')||[...DEFAULT_EMPLOYEE_TITLES]}catch(_e){employeeTitles=[...DEFAULT_EMPLOYEE_TITLES]}
+      employeeTitles=[...new Set([...employeeTitles,...employees.map(e=>String(e.title||'').trim()).filter(Boolean)])];
       try{loginUsers=JSON.parse(localStorage.getItem('erpLoginUsersV1')||'[]')||[]}catch(_e){loginUsers=[]}
       try{payrollRecords=JSON.parse(localStorage.getItem('weiyuPayrollV1')||'[]')||[]}catch(_e){payrollRecords=[]}
       try{salesRecords=JSON.parse(localStorage.getItem('weiyuSalesV1')||'[]')||[]}catch(_e){salesRecords=[]}
@@ -616,7 +625,7 @@
       try{miscExpenses=JSON.parse(localStorage.getItem('weiyuMiscExpensesV1')||'[]')||[]}catch(_e){miscExpenses=[]}
     }
     function renderAllCloudData(){
-      initBrandOptions();renderCostCategoryOptions();renderVehicles();renderCostManagement();renderEmployees();renderPayroll();renderSales();renderInventoryRecords();renderAccounting();renderDashboard();
+      initBrandOptions();renderCostCategoryOptions();renderEmployeeTitleOptions();renderVehicles();renderCostManagement();renderEmployees();renderPayroll();renderSales();renderInventoryRecords();renderAccounting();renderDashboard();
     }
     async function initializeApp(){
       document.getElementById('app')?.classList.remove('hidden');
@@ -860,12 +869,51 @@
     function downloadSelectedExcel(){const list=vehicles.filter(v=>selectedVehicleIds.has(v.id));if(!list.length){alert('請先勾選要下載的資料。');return}const headers=vehicleReportRows(list[0]).map(x=>x[0]);const data=[headers,...list.map(v=>vehicleReportRows(v).map(x=>x[1]))];const ws=XLSX.utils.aoa_to_sheet(data);ws['!cols']=headers.map((h,i)=>({wch:Math.max(12,...data.slice(1).map(r=>String(r[i]??'').length+2))}));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'車輛進出庫');XLSX.writeFile(wb,`車輛進出庫資料_${new Date().toISOString().slice(0,10)}.xlsx`)}
 
     const EMPLOYEE_STORAGE_KEY='weiyuEmployeesV1';
+    const EMPLOYEE_TITLE_STORAGE_KEY='weiyuEmployeeTitlesV1';
+    const DEFAULT_EMPLOYEE_TITLES=['店長','助理','業務','內勤','會計'];
     let employees=JSON.parse(localStorage.getItem(EMPLOYEE_STORAGE_KEY)||'[]');
+    let employeeTitles=JSON.parse(localStorage.getItem(EMPLOYEE_TITLE_STORAGE_KEY)||'null')||[...DEFAULT_EMPLOYEE_TITLES];
+    employeeTitles=[...new Set([...employeeTitles,...employees.map(e=>String(e.title||'').trim()).filter(Boolean)])];
     let editingEmployeeId=null;
     let employeeViewMode=false;
     const employeeFields=['name','idNumber','birthDate','gender','mobile','phone','email','emergencyName','emergencyRelation','emergencyPhone','mailingAddress','registeredAddress','hireDate','terminationDate','status','title','workType','manager','bankCode','branchCode','bankHolder','bankAccount','laborInsurance','healthInsurance','pensionSalary','pensionSelfRate','baseSalary','positionAllowance','attendanceBonus','otherAllowance','salesCommissionRate'];
     function employeeInputId(key){return 'emp'+key.charAt(0).toUpperCase()+key.slice(1)}
     function persistEmployees(){localStorage.setItem(EMPLOYEE_STORAGE_KEY,JSON.stringify(employees))}
+    function persistEmployeeTitles(){localStorage.setItem(EMPLOYEE_TITLE_STORAGE_KEY,JSON.stringify(employeeTitles))}
+    function renderEmployeeTitleOptions(selected=''){
+      const sel=document.getElementById('empTitle');if(!sel)return;
+      const titles=[...new Set([...employeeTitles,...employees.map(e=>String(e.title||'').trim()).filter(Boolean)])];
+      sel.innerHTML='<option value="">請選擇</option>'+titles.map(t=>`<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+      if(selected&&!titles.includes(selected))sel.innerHTML+=`<option value="${escapeHtml(selected)}">${escapeHtml(selected)}</option>`;
+      sel.value=selected||'';
+    }
+    function openEmployeeTitleManager(){renderEmployeeTitleManager();document.getElementById('employeeTitleManagerModal').classList.add('open')}
+    function closeEmployeeTitleManager(){document.getElementById('employeeTitleManagerModal').classList.remove('open')}
+    function renderEmployeeTitleManager(){
+      const box=document.getElementById('employeeTitleManagerList');if(!box)return;
+      box.innerHTML=employeeTitles.length?employeeTitles.map(t=>`<div class="manager-row"><b>${escapeHtml(t)}</b><div class="manager-actions"><button class="btn btn-sm btn-light" onclick="renameEmployeeTitle('${encodeURIComponent(t)}')">編輯</button><button class="btn btn-sm btn-danger" onclick="deleteEmployeeTitle('${encodeURIComponent(t)}')">刪除</button></div></div>`).join(''):'<div class="manager-empty">尚未建立職稱</div>';
+    }
+    function addEmployeeTitle(){
+      const input=document.getElementById('newEmployeeTitle'),name=input.value.trim();
+      if(!name)return alert('請輸入職稱名稱。');
+      if(employeeTitles.includes(name))return alert('此職稱已存在。');
+      employeeTitles.push(name);employeeTitles.sort((a,b)=>a.localeCompare(b,'zh-Hant'));input.value='';persistEmployeeTitles();renderEmployeeTitleManager();renderEmployeeTitleOptions(document.getElementById('empTitle')?.value||'');
+    }
+    function renameEmployeeTitle(encoded){
+      const oldName=decodeURIComponent(encoded),newName=prompt('請輸入新的職稱名稱：',oldName)?.trim();
+      if(!newName||newName===oldName)return;
+      if(employeeTitles.includes(newName))return alert('此職稱已存在。');
+      employeeTitles=employeeTitles.map(t=>t===oldName?newName:t);
+      employees.forEach(e=>{if(e.title===oldName)e.title=newName});
+      persistEmployeeTitles();persistEmployees();renderEmployeeTitleManager();renderEmployeeTitleOptions(newName);renderEmployees();renderPayroll();renderSales();
+    }
+    function deleteEmployeeTitle(encoded){
+      const name=decodeURIComponent(encoded);
+      const used=employees.filter(e=>e.title===name).length;
+      const note=used?`\n目前有 ${used} 位員工使用此職稱；刪除後既有員工資料會保留原職稱，但新增／編輯時不再出現在選單。`:'';
+      if(!confirm(`確定刪除職稱「${name}」嗎？${note}`))return;
+      employeeTitles=employeeTitles.filter(t=>t!==name);persistEmployeeTitles();renderEmployeeTitleManager();renderEmployeeTitleOptions(document.getElementById('empTitle')?.value||'');
+    }
     function employeeStatusTag(status){const cls=status==='在職'?'tag-sold':status==='留職停薪'?'tag-ready':'tag-pending';return `<span class="tag ${cls}">${escapeHtml(status||'－')}</span>`}
     function maskSensitive(value,visible=3){value=String(value||'');if(!value)return '－';if(value.length<=visible)return '•'.repeat(value.length);return value.slice(0,visible)+'•'.repeat(Math.max(3,value.length-visible))}
     function renderEmployees(){
@@ -877,7 +925,7 @@
     }
     function switchEmployeeTab(name,btn){document.querySelectorAll('.employee-pane').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.employee-tab').forEach(b=>b.classList.remove('active'));document.getElementById('employeePane'+name.charAt(0).toUpperCase()+name.slice(1)).classList.add('active');btn.classList.add('active')}
     function setEmployeeFormReadOnly(readOnly){document.querySelectorAll('#employeeModal input,#employeeModal select,#employeeModal textarea').forEach(el=>{el.disabled=readOnly});document.getElementById('employeeSaveBtn').style.display=readOnly?'none':'inline-flex';document.getElementById('employeeDeleteBtn').style.display=readOnly?'none':(editingEmployeeId?'block':'none');document.getElementById('employeeCancelBtn').textContent=readOnly?'關閉':'取消'}
-    function openEmployeeModal(id=null){employeeViewMode=false;editingEmployeeId=id;const e=id?employees.find(x=>x.id===id):null;document.getElementById('employeeModalTitle').textContent=e?'編輯員工資料':'新增員工';employeeFields.forEach(k=>{const el=document.getElementById(employeeInputId(k));if(!el)return;const val=e?.[k]??'';el.value=val});setRocBirthFields('empBirthDate',e?.birthDate||'');document.getElementById('empEmergencyConsent').checked=!!e?.emergencyConsent;if(!e){document.getElementById('empStatus').value='在職';document.getElementById('empWorkType').value='全職';document.getElementById('empHireDate').value=new Date().toISOString().slice(0,10)}document.querySelectorAll('.employee-pane').forEach((p,i)=>p.classList.toggle('active',i===0));document.querySelectorAll('.employee-tab').forEach((b,i)=>b.classList.toggle('active',i===0));setEmployeeFormReadOnly(false);document.getElementById('employeeModal').classList.add('open')}
+    function openEmployeeModal(id=null){employeeViewMode=false;editingEmployeeId=id;const e=id?employees.find(x=>x.id===id):null;document.getElementById('employeeModalTitle').textContent=e?'編輯員工資料':'新增員工';renderEmployeeTitleOptions(e?.title||'');employeeFields.forEach(k=>{const el=document.getElementById(employeeInputId(k));if(!el)return;const val=e?.[k]??'';el.value=val});setRocBirthFields('empBirthDate',e?.birthDate||'');document.getElementById('empEmergencyConsent').checked=!!e?.emergencyConsent;if(!e){document.getElementById('empStatus').value='在職';document.getElementById('empWorkType').value='全職';document.getElementById('empHireDate').value=new Date().toISOString().slice(0,10)}document.querySelectorAll('.employee-pane').forEach((p,i)=>p.classList.toggle('active',i===0));document.querySelectorAll('.employee-tab').forEach((b,i)=>b.classList.toggle('active',i===0));setEmployeeFormReadOnly(false);document.getElementById('employeeModal').classList.add('open')}
     let viewingEmployeeId=null;
     function employeeReportValue(v){return escapeHtml(v===null||v===undefined||v===''?'－':v)}
     function employeeMoney(v){return money(Number(v||0))}
