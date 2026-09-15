@@ -206,9 +206,13 @@
 </head>
 <body>
 
+  <section id="authScreen" class="login-screen">
+    <div class="login-visual"><div class="brand-block"><div class="brand-mark">WEIYU ERP</div><div class="brand-title">威宇國際車業<br>管理系統</div><div class="brand-sub">車輛、銷售與員工資料已分表保存，並具備逐筆版本紀錄與每日自動備份。</div></div></div>
+    <div class="login-panel"><div class="login-card" id="authCard"><h1>登入 ERP</h1><p>請使用已授權的 Google 帳號登入。</p><button class="btn btn-primary google-btn" type="button" onclick="signInWithGoogle()">使用 Google 帳號登入</button><div id="authError" class="login-error"></div><div class="preview-note">未登入或未列入允許名單，無法讀取及修改公司資料。</div></div></div>
+  </section>
 
   <div id="sidebarOverlay" class="sidebar-overlay" onclick="closeMobileMenu()"></div>
-  <div id="app" class="app">
+  <div id="app" class="app hidden">
     <aside class="sidebar">
       <div class="logo">威宇<span>國際車業</span></div>
       <nav class="nav">
@@ -224,7 +228,7 @@
     </aside>
 
     <main class="main">
-      <header class="topbar"><div style="display:flex;align-items:center;gap:10px;min-width:0"><button class="btn btn-light mobile-menu-btn" aria-label="開啟選單" onclick="toggleMobileMenu()">☰</button><h2 id="pageTitle">營運總覽</h2></div><div class="top-actions"><span id="syncStatus" class="sync-status">資料載入中…</span><button id="installAppBtn" class="btn btn-light install-btn" onclick="installApp()">加入桌面</button></div></header>
+      <header class="topbar"><div style="display:flex;align-items:center;gap:10px;min-width:0"><button class="btn btn-light mobile-menu-btn" aria-label="開啟選單" onclick="toggleMobileMenu()">☰</button><h2 id="pageTitle">營運總覽</h2></div><div class="top-actions"><span id="syncStatus" class="sync-status">資料載入中…</span><button id="installAppBtn" class="btn btn-light install-btn" onclick="installApp()">加入桌面</button><button class="btn btn-light" onclick="signOutERP()">登出</button></div></header>
       <div class="content">
         <section id="dashboard" class="page active">
           <div class="card welcome"><div class="welcome-row"><div><p id="currentRocDate"></p></div><span id="modeBadge" class="preview-badge">● 預覽模式</span></div></div>
@@ -460,10 +464,9 @@
     const SUPABASE_URL = 'https://imfsgjdvivybbpvemrcw.supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_xFPCi9ky-6HEEyBkNP-bQA_fVGwQO89';
 
-    // 無登入共用雲端版：首次開啟時清除舊版瀏覽器內的範例／暫存業務資料，之後以 Supabase 為主。
+    // 正式雲端版不再自動清除瀏覽器資料；未成功同步的異動會保留在待傳佇列。
     const CLOUD_CLEANUP_MARKER='weiyuCloudOnlyCleanV1';
     if(localStorage.getItem(CLOUD_CLEANUP_MARKER)!=='1'){
-      ['vehicles','weiyuEmployeesV1','erpLoginUsersV1','weiyuPayrollV1','weiyuSalesV1','weiyuInventoryTradesV2','weiyuMiscExpensesV1'].forEach(key=>localStorage.setItem(key,'[]'));
       localStorage.setItem(CLOUD_CLEANUP_MARKER,'1');
     }
 
@@ -530,7 +533,15 @@
     const APP_DATA_KEYS=['vehicleBrandModels','vehicles','vehicleCostCategories','weiyuEmployeesV1','weiyuEmployeeTitlesV1','erpCompanyNameV1','erpLoginUsersV1','weiyuPayrollV1','weiyuSalesV1','weiyuInventoryTradesV2','weiyuMiscExpensesV1'];
 
     const SHARED_STATE_ID='weiyu_erp_shared';
-    let cloudReady=false;
+    const AUTHORIZED_ADMIN_EMAILS=['weiyu12758@gmail.com','weiyu12755@gmail.com'];
+    const SPLIT_TABLES={
+      vehicles:{table:'erp_vehicles',toRow:x=>({id:String(x.id),case_no:x.caseNo||null,plate:x.plate||null,brand:x.brand||null,model:x.model||null,status:x.status||null,data:x})},
+      weiyuSalesV1:{table:'erp_sales',toRow:x=>({id:String(x.id),vehicle_id:x.vehicleId||null,customer_name:x.customerName||null,employee_id:x.employeeId||null,status:x.status||null,order_date:x.orderDate||null,data:x})},
+      weiyuEmployeesV1:{table:'erp_employees',toRow:x=>({id:String(x.id),name:x.name||null,title:x.title||null,status:x.status||null,data:x})}
+    };
+    const SYNC_QUEUE_KEY='weiyuErpPendingSyncV2';
+    let lastSyncedCollections={vehicles:new Map(),weiyuSalesV1:new Map(),weiyuEmployeesV1:new Map()};
+    let cloudReady=false,syncInFlight=false;
     function setSyncStatus(text,state=''){
       const el=document.getElementById('syncStatus');if(!el)return;
       el.textContent=text;el.style.color=state==='error'?'#c73838':state==='ok'?'#1b8f5a':'var(--muted)';
@@ -559,35 +570,74 @@
       try{APP_DATA_KEYS.forEach(k=>originalLocalStorageSetItem(k,String(clean[k]??EMPTY_CLOUD_STATE[k]??'')))}finally{isApplyingRemoteState=false}
       return clean;
     }
+    function parseArray(value){try{const list=JSON.parse(value||'[]');return Array.isArray(list)?list:[]}catch(_e){return []}}
+    function setAuthError(message=''){const el=document.getElementById('authError');if(!el)return;el.textContent=message;el.classList.toggle('show',!!message)}
+    function showAuthScreen(message=''){
+      document.getElementById('authScreen')?.classList.remove('hidden');document.getElementById('app')?.classList.add('hidden');setAuthError(message);
+    }
+    function showERP(){document.getElementById('authScreen')?.classList.add('hidden');document.getElementById('app')?.classList.remove('hidden');setAuthError('')}
+    async function signInWithGoogle(){
+      try{document.getElementById('authCard')?.classList.add('login-loading');setAuthError('');const redirectTo=location.origin+location.pathname;const {error}=await getSupabase().auth.signInWithOAuth({provider:'google',options:{redirectTo}});if(error)throw error}
+      catch(error){document.getElementById('authCard')?.classList.remove('login-loading');setAuthError('登入失敗：'+error.message)}
+    }
+    async function signOutERP(){if(!confirm('確定要登出 ERP 嗎？'))return;cloudReady=false;await getSupabase().auth.signOut();currentAuthUser=null;showAuthScreen('已安全登出。')}
+    function readSyncQueue(){try{const q=JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY)||'[]');return Array.isArray(q)?q:[]}catch(_e){return []}}
+    function writeSyncQueue(queue){originalLocalStorageSetItem(SYNC_QUEUE_KEY,JSON.stringify(queue))}
+    function queueOperation(op){const q=readSyncQueue();if(op.kind==='settings'){
+      const i=q.findIndex(x=>x.kind==='settings');if(i>=0)q[i]=op;else q.push(op);
+    }else{
+      const i=q.findIndex(x=>x.kind===op.kind&&x.table===op.table&&x.id===op.id);if(i>=0)q[i]=op;else q.push(op);
+    }writeSyncQueue(q);processSyncQueue()}
+    function queueCollectionDiff(key,value){
+      const cfg=SPLIT_TABLES[key],next=parseArray(value),nextMap=new Map(next.filter(x=>x&&x.id).map(x=>[String(x.id),x])),prev=lastSyncedCollections[key]||new Map();
+      nextMap.forEach((item,id)=>{if(JSON.stringify(prev.get(id))!==JSON.stringify(item))queueOperation({kind:'record',table:cfg.table,id,action:'upsert',row:cfg.toRow(item)})});
+      prev.forEach((_item,id)=>{if(!nextMap.has(id))queueOperation({kind:'record',table:cfg.table,id,action:'delete'})});
+      lastSyncedCollections[key]=nextMap;
+    }
+    function queueSettingsSnapshot(){queueOperation({kind:'settings',state:collectLocalAppState(),queuedAt:new Date().toISOString()})}
+    async function processSyncQueue(){
+      if(syncInFlight||!cloudReady||!currentAuthUser)return;syncInFlight=true;
+      try{
+        let q=readSyncQueue();
+        while(q.length){
+          setSyncStatus(`同步中（剩餘 ${q.length}）…`);const op=q[0];let result;
+          if(op.kind==='settings')result=await getSupabase().from('app_state').upsert({id:SHARED_STATE_ID,state:op.state,updated_at:new Date().toISOString()},{onConflict:'id'});
+          else if(op.action==='delete')result=await getSupabase().from(op.table).delete().eq('id',op.id);
+          else result=await getSupabase().from(op.table).upsert(op.row,{onConflict:'id'});
+          if(result.error)throw result.error;q.shift();writeSyncQueue(q);
+        }
+        setSyncStatus('已同步至 Supabase','ok');
+      }catch(error){console.error(error);setSyncStatus('同步失敗，已保留待傳資料','error')}
+      finally{syncInFlight=false}
+    }
     async function pullSupabaseState(){
       if(!isSupabaseConfigured())return false;
       setSyncStatus('資料載入中…');
-      const {data,error}=await getSupabase().from('app_state').select('state,updated_at').eq('id',SHARED_STATE_ID).maybeSingle();
-      if(error)throw error;
-      if(!data){
-        const clean=applyRemoteAppState(EMPTY_CLOUD_STATE);
-        const {error:createError}=await getSupabase().from('app_state').upsert({id:SHARED_STATE_ID,state:clean,updated_at:new Date().toISOString()},{onConflict:'id'});
-        if(createError)throw createError;
-        return true;
-      }
-      const clean=sanitizeCloudState(data.state);
-      const local=collectLocalAppState();
-      if(JSON.stringify(clean)!==JSON.stringify(local)){applyRemoteAppState(clean);return true}
-      setSyncStatus('已連接 Supabase','ok');
-      return false;
+      const [stateRes,vehicleRes,saleRes,employeeRes]=await Promise.all([
+        getSupabase().from('app_state').select('state,updated_at').eq('id',SHARED_STATE_ID).maybeSingle(),
+        getSupabase().from('erp_vehicles').select('id,data').order('updated_at',{ascending:false}),
+        getSupabase().from('erp_sales').select('id,data').order('updated_at',{ascending:false}),
+        getSupabase().from('erp_employees').select('id,data').order('updated_at',{ascending:false})
+      ]);
+      const failed=[stateRes,vehicleRes,saleRes,employeeRes].find(r=>r.error);if(failed)throw failed.error;
+      const clean=sanitizeCloudState(stateRes.data?.state||EMPTY_CLOUD_STATE);
+      clean.vehicles=JSON.stringify((vehicleRes.data||[]).map(r=>r.data));
+      clean.weiyuSalesV1=JSON.stringify((saleRes.data||[]).map(r=>r.data));
+      clean.weiyuEmployeesV1=JSON.stringify((employeeRes.data||[]).map(r=>r.data));
+      applyRemoteAppState(clean);
+      Object.keys(SPLIT_TABLES).forEach(k=>{lastSyncedCollections[k]=new Map(parseArray(clean[k]).filter(x=>x&&x.id).map(x=>[String(x.id),x]))});
+      return true;
     }
     async function pushSupabaseState(immediate=false){
-      if(!cloudReady||!isSupabaseConfigured())return;
+      if(!cloudReady||!currentAuthUser||!isSupabaseConfigured())return;
       if(!immediate){clearTimeout(syncTimer);syncTimer=setTimeout(()=>pushSupabaseState(true),700);return}
-      try{
-        setSyncStatus('同步中…');
-        const {error}=await getSupabase().from('app_state').upsert({id:SHARED_STATE_ID,state:collectLocalAppState(),updated_at:new Date().toISOString()},{onConflict:'id'});
-        if(error)throw error;
-        setSyncStatus('已同步至 Supabase','ok');
-      }catch(error){console.error(error);setSyncStatus('同步失敗','error')}
+      queueSettingsSnapshot();
     }
     const originalLocalStorageSetItem=localStorage.setItem.bind(localStorage);
-    localStorage.setItem=function(key,value){originalLocalStorageSetItem(key,value);if(!isApplyingRemoteState&&APP_DATA_KEYS.includes(String(key)))pushSupabaseState()};
+    localStorage.setItem=function(key,value){
+      originalLocalStorageSetItem(key,value);key=String(key);if(isApplyingRemoteState||!APP_DATA_KEYS.includes(key))return;
+      if(SPLIT_TABLES[key])queueCollectionDiff(key,value);else pushSupabaseState();
+    };
     function toggleMobileMenu(){document.body.classList.toggle('sidebar-open')}
     function closeMobileMenu(){document.body.classList.remove('sidebar-open')}
     window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();pendingInstallPrompt=e;const b=document.getElementById('installAppBtn');if(b)b.style.display='inline-flex'});
@@ -666,19 +716,29 @@
       initBrandOptions();renderCostCategoryOptions();renderEmployeeTitleOptions();renderVehicles();renderCostManagement();renderEmployees();renderPayroll();renderSales();renderInventoryRecords();renderAccounting();renderDashboard();
     }
     async function initializeApp(){
-      document.getElementById('app')?.classList.remove('hidden');
       const badge=document.getElementById('modeBadge');
-      if(badge){badge.textContent='● Supabase 雲端版';badge.style.background='#e7f8ee';badge.style.color='#1a7a4e'}
-      if(!isSupabaseConfigured()){setSyncStatus('尚未設定 Supabase','error');return}
+      if(badge){badge.textContent='● 安全雲端正式版';badge.style.background='#e7f8ee';badge.style.color='#1a7a4e'}
+      if(!isSupabaseConfigured()){showAuthScreen('尚未設定 Supabase。');return}
       try{
+        const {data:{session},error:sessionError}=await getSupabase().auth.getSession();if(sessionError)throw sessionError;
+        if(!session){showAuthScreen();return}
+        currentAuthUser=session.user;
+        if(!AUTHORIZED_ADMIN_EMAILS.includes(String(currentAuthUser.email||'').toLowerCase())){
+          await getSupabase().auth.signOut();currentAuthUser=null;showAuthScreen('這個 Google 帳號未列入 ERP 管理員名單。');return;
+        }
+        const {data:member,error:memberError}=await getSupabase().from('erp_allowed_emails').select('email,display_name,role,active').maybeSingle();
+        if(memberError)throw memberError;
+        if(!member){await getSupabase().auth.signOut();currentAuthUser=null;showAuthScreen('這個 Google 帳號尚未加入 ERP 允許名單，請由管理員在 erp_allowed_emails 新增信箱。');return}
+        showERP();
         await pullSupabaseState();
+        cloudReady=true;
+        await processSyncQueue();
+        if(readSyncQueue().length===0)await pullSupabaseState();
         hydrateRuntimeFromStorage();
         renderAllCloudData();
-        cloudReady=true;
-        setSyncStatus('已連接 Supabase','ok');
+        setSyncStatus(`已連接｜${member.display_name||currentAuthUser.email}`,'ok');
       }catch(error){
-        console.error(error);cloudReady=false;setSyncStatus('Supabase 連線失敗','error');
-        alert('Supabase 連線失敗：'+error.message+'\n請先執行隨附的完整 SQL。');
+        console.error(error);cloudReady=false;showAuthScreen('Supabase 連線失敗：'+error.message+'。請先執行隨附的完整 SQL。');
       }
     }
 
