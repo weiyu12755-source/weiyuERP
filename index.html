@@ -1056,8 +1056,39 @@
     editVehicle=function(id){editVehicleBeforeEducationFund(id);const v=vehicles.find(x=>x.id===id);document.getElementById('educationFund').value=Number(v?.educationFund||0);updateTotalPreview()};
     const renderCostCategoryOptionsBeforeEducationFund=renderCostCategoryOptions;
     renderCostCategoryOptions=function(){if(!costCategories.includes('教育基金'))costCategories.push('教育基金');renderCostCategoryOptionsBeforeEducationFund()};
+    /*
+      正式報表分類金額以「成本明細」加總為準。
+      舊資料若尚無該分類明細，才回讀原車籍成本欄位，避免明細已有金額但報表仍顯示 0。
+    */
+    function reportCategoryAmount(v,names,fallbackKey){
+      const targets=new Set(names.map(name=>String(name).trim()));
+      const matched=(v.costEntries||[]).filter(entry=>targets.has(String(entry.category||'').trim()));
+      return matched.length?matched.reduce((sum,entry)=>sum+Number(entry.amount||0),0):Number(v[fallbackKey]||0);
+    }
     const buildSingleOfficialReportBeforeEducationFund=buildSingleOfficialReport;
-    buildSingleOfficialReport=function(v){return buildSingleOfficialReportBeforeEducationFund(v).replace(`<tr><th>管銷</th><td>${money(Number(v.overhead||0))}</td></tr>`,`<tr><th>教育基金</th><td>${money(Number(v.educationFund||0))}</td></tr><tr><th>管銷</th><td>${money(Number(v.overhead||0))}</td></tr>`)};
+    buildSingleOfficialReport=function(v){
+      const reportVehicle={...v,
+        transferTaxInsurance:reportCategoryAmount(v,['過戶／稅金／保險','過戶/稅金/保險'],'transferTaxInsurance'),
+        bodyPaint:reportCategoryAmount(v,['鈑烤'],'bodyPaint'),
+        repair:reportCategoryAmount(v,['維修'],'repair'),
+        modification:reportCategoryAmount(v,['改裝'],'modification'),
+        fuel:reportCategoryAmount(v,['油資'],'fuel'),
+        detailing:reportCategoryAmount(v,['美容'],'detailing'),
+        otherCost:reportCategoryAmount(v,['其他'],'otherCost'),
+        certificationFee:reportCategoryAmount(v,['認證費'],'certificationFee'),
+        referralCommission:reportCategoryAmount(v,['介紹佣金'],'referralCommission'),
+        assistantBonus:reportCategoryAmount(v,['助理獎金'],'assistantBonus'),
+        contestBonus:reportCategoryAmount(v,['競賽彩金'],'contestBonus'),
+        educationFund:reportCategoryAmount(v,['教育基金'],'educationFund'),
+        overhead:reportCategoryAmount(v,['管銷'],'overhead'),
+        purchaseBonus:reportCategoryAmount(v,['採購獎金'],'purchaseBonus'),
+        preparationCost:reportCategoryAmount(v,['做成本'],'preparationCost')
+      };
+      return buildSingleOfficialReportBeforeEducationFund(reportVehicle).replace(
+        `<tr><th>管銷</th><td>${money(Number(reportVehicle.overhead||0))}</td></tr>`,
+        `<tr><th>教育基金</th><td>${money(reportVehicle.educationFund)}</td></tr><tr><th>管銷</th><td>${money(reportVehicle.overhead)}</td></tr><tr><th>做成本</th><td>${money(reportVehicle.preparationCost)}</td></tr>`
+      );
+    };
 
     const YARD_REPORT_HEADERS=['序','日期','廠牌','型號','年份','車號','顏色','排氣量','進價','做成本','整備','稅金','介紹費','總成本','備註','狀況','付款','來源'];
     function vehicleCategoryAmount(v,names,fallbackKey){
