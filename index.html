@@ -1086,7 +1086,7 @@
       };
       return buildSingleOfficialReportBeforeEducationFund(reportVehicle).replace(
         `<tr><th>管銷</th><td>${money(Number(reportVehicle.overhead||0))}</td></tr>`,
-        `<tr><th>教育基金</th><td>${money(reportVehicle.educationFund)}</td></tr><tr><th>管銷</th><td>${money(reportVehicle.overhead)}</td></tr><tr><th>做成本</th><td>${money(reportVehicle.preparationCost)}</td></tr>`
+        `<tr><th>教育基金</th><td>${money(reportVehicle.educationFund)}</td></tr><tr><th>管銷</th><td>${money(reportVehicle.overhead)}</td></tr>`
       );
     };
 
