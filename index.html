@@ -226,7 +226,18 @@
     .payroll-summary-table .summary-total td{font-weight:bold;color:#008000;background:#fff;text-align:right;border-top:1px solid #000;border-left:1px solid #000}
     .payroll-summary-table .summary-total td:first-child{text-align:center}
     #payrollSummaryModal .report-preview-wrap{overflow:auto;max-height:75vh}
-</style>
+    /* 售出表附件：淡紫標題、序號底色、完整細框；固定 A4 橫式比例。 */
+    #monthlySalesReportModal .report-preview-wrap{overflow:auto!important}
+    .monthly-report-page{width:1123px;max-width:none;min-height:0;margin:0 auto 20px;padding:16px 14px;background:#fff;box-shadow:0 5px 20px rgba(0,0,0,.12);box-sizing:border-box;color:#111;font-family:Arial,"Microsoft JhengHei",sans-serif}
+    .monthly-report-table{width:100%;table-layout:fixed;border-collapse:collapse;border:1px solid #222;font-size:11px;line-height:1.2}
+    .monthly-report-table th,.monthly-report-table td{border:1px solid #222;height:27px;padding:2px 3px;vertical-align:middle;text-align:center;box-sizing:border-box;overflow-wrap:anywhere;word-break:break-word;font-weight:400}
+    .monthly-report-table th.monthly-title{height:40px;background:#ccccff;font-size:17px;text-align:center}
+    .monthly-report-table .monthly-ordinal{background:#ffff99}
+    .monthly-report-table .monthly-number{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+    .monthly-report-table .monthly-totals td{height:31px;color:#e00000;border-bottom:1px solid #222}
+    .monthly-report-table .monthly-empty{height:40px;color:#666}
+
+  </style>
 </head>
 <body>
 
@@ -305,7 +316,7 @@
           <div id="salesKpis" class="sales-kpis"></div>
           <div class="card full-card">
             <div class="section-head"><div><h3>銷售與收款</h3><p>依庫存車建立銷售單，連動車輛成本、員工業務與薪資佣金</p></div><div class="action-group"><button class="btn btn-light" onclick="openReferrerRateManager()">管理介紹人抽成比例</button><button class="btn btn-primary" onclick="openSalesModal()">＋ 新增銷售單</button></div></div>
-            <div class="toolbar"><input id="salesSearch" placeholder="搜尋車牌、車款、客戶、業務" oninput="renderSales()"><select id="salesStatusFilter" onchange="renderSales()"><option value="">全部狀態</option><option>未收訂</option><option>已收訂</option><option>辦貸款</option><option>待交車</option><option>已完成</option><option>取消</option></select><input id="salesMonthFilter" type="month" onchange="renderSales()"><button class="btn btn-light" onclick="previewSalesReport()">預覽篩選報表</button><button class="btn btn-light" onclick="printSelectedSalesReports()">批量列印</button><button class="btn btn-light" onclick="downloadSelectedSalesReportsPdf()">批量下載 PDF</button><button class="btn btn-light" onclick="downloadSalesExcel()">下載 Excel</button><span class="selected-count" id="salesSelectedCount">已勾選 0 筆</span></div>
+            <div class="toolbar"><input id="salesSearch" placeholder="搜尋車牌、車款、客戶、業務" oninput="renderSales()"><select id="salesStatusFilter" onchange="renderSales()"><option value="">全部狀態</option><option>未收訂</option><option>已收訂</option><option>辦貸款</option><option>待交車</option><option>已完成</option><option>取消</option></select><input id="salesMonthFilter" type="month" onchange="renderSales()"><label for="monthlySalesMonth">月銷售月份</label><input id="monthlySalesMonth" type="month"><button class="btn btn-light" onclick="previewMonthlySalesReport()">預覽月銷售紀錄表</button><button class="btn btn-light" onclick="previewSalesReport()">預覽篩選報表</button><button class="btn btn-light" onclick="printSelectedSalesReports()">批量列印</button><button class="btn btn-light" onclick="downloadSelectedSalesReportsPdf()">批量下載 PDF</button><button class="btn btn-light" onclick="downloadSalesExcel()">下載 Excel</button><span class="selected-count" id="salesSelectedCount">已勾選 0 筆</span></div>
             <div class="table-wrap"><table class="sales-table"><thead><tr><th><input class="vehicle-check" type="checkbox" id="selectAllSales" onchange="toggleSelectAllSales(this.checked)"></th><th>收訂日</th><th>撥款日</th><th>交車日</th><th>年份</th><th>廠牌</th><th>車款</th><th>車牌</th><th>新車牌</th><th>顏色</th><th>銷售總價</th><th>總成本</th><th>實收金額</th><th>整台總利潤</th><th>公司持有%</th><th>公司分攤利潤</th><th>同行應結算</th><th>稅金</th><th>教育基金</th><th>實利潤</th><th>業務</th><th>抽成</th><th>業務獎金</th><th>公司總毛利</th><th>直屬主管</th><th>直屬分潤</th><th>介紹人</th><th>介紹人抽成</th><th>公司銷售淨利</th><th>狀態</th><th>操作</th></tr></thead><tbody id="salesRows"></tbody></table></div>
           </div>
         </section>
@@ -444,6 +455,8 @@
     <div class="field"><label>直屬主管</label><input id="saleManagerName" class="readonly-box" readonly></div><div class="field"><label>直屬分潤比例</label><input id="saleManagerCommissionRate" class="readonly-box" readonly></div><div class="field"><label>介紹人</label><input id="saleReferrerName" placeholder="例如：王先生／合作車商／員工姓名" oninput="refreshSalesCalc()"><small style="display:block;color:var(--muted);margin-top:6px">可留空；填寫後依下方比例抽公司利潤。</small></div><div class="field"><label>介紹人抽成比例</label><select id="saleReferrerCommissionRate" onchange="refreshSalesCalc()"></select></div><div class="field"><label>介紹人抽成基礎（自動）</label><input id="saleReferrerProfitBase" class="readonly-box" readonly value="NT$0"></div><div class="field span-3"><label>備註</label><textarea id="saleNote" rows="3"></textarea></div>
     <div class="sales-auto-box"><div><small>總成本</small><b id="saleCalcCost">NT$0</b></div><div><small>整台總利潤</small><b id="saleCalcProfit">NT$0</b></div><div><small>公司持有比例</small><b id="saleCalcOwnershipRate">100%</b></div><div><small>公司分攤利潤</small><b id="saleCalcCompanyShareProfit">NT$0</b></div><div><small>同行應結算</small><b id="saleCalcPartnerSettlement">NT$0</b></div><div><small>稅金</small><b id="saleCalcTax">NT$0</b></div><div><small>教育基金</small><b id="saleCalcEducationFund">NT$0</b></div><div><small>實利潤（獎金基礎）</small><b id="saleCalcRealProfit">NT$0</b></div><div><small>業務獎金</small><b id="saleCalcCommission">NT$0</b></div><div><small>公司總毛利</small><b id="saleCalcCompanyGross">NT$0</b></div><div><small>直屬分潤</small><b id="saleCalcManagerCommission">NT$0</b></div><div><small>介紹人抽成</small><b id="saleCalcReferrerCommission">NT$0</b></div><div><small>公司銷售淨利</small><b id="saleCalcCompanyProfit">NT$0</b></div><div><small>應收餘額</small><b id="saleCalcBalance">NT$0</b></div></div>
   </div></div><div class="modal-actions"><button class="btn btn-danger" id="salesDeleteBtn" style="margin-right:auto;display:none" onclick="deleteCurrentSale()">刪除</button><button class="btn btn-light" onclick="closeSalesModal()">取消</button><button class="btn btn-primary" onclick="saveSale()">儲存銷售單</button></div></div></div>
+
+  <div id="monthlySalesReportModal" class="modal"><div class="modal-box report-modal-box" style="width:min(1230px,98vw)"><div class="modal-head"><h3 style="margin:0">月銷售紀錄表｜橫式 A4</h3><button class="btn btn-light" onclick="closeMonthlySalesReport()">關閉</button></div><div class="modal-body report-preview-wrap" id="monthlySalesReportContent"></div><div class="modal-actions"><button class="btn btn-light" onclick="downloadMonthlySalesExcel()">下載 Excel</button><button class="btn btn-primary" id="monthlySalesPdfButton" onclick="downloadMonthlySalesPdf()">下載 PDF</button></div></div></div>
 
   <div id="salesReportModal" class="modal sales-report-modal"><div class="modal-box report-modal-box"><div class="modal-head"><h3 style="margin:0">銷售與收款報表</h3><button class="btn btn-light" onclick="closeSalesReportModal()">關閉</button></div><div class="modal-body report-preview-wrap"><div id="salesReportContent" class="sales-report"></div></div><div class="modal-actions"><button class="btn btn-primary" onclick="downloadSalesReportPdf()">下載 PDF</button></div></div></div>
 
@@ -1809,6 +1822,67 @@
       event.returnValue='';
     });
 
+    // 月銷售紀錄表：對應售出表附件兩段式欄位，與既有銷售明細匯出互不影響。
+    const MONTHLY_SOLD_HEADERS=['序','收訂日','撥款日','交車日','年份','廠牌','車款','車牌','新車牌','顏色','進車價','整備費','總成本','實收金額','利潤','業務'];
+    const MONTHLY_SWAP_HEADERS=['序','收款日','交車日','付款方式','年份','廠牌','車款','車牌','新車牌','顏色','總成本','盤調金額','來源','採購','總毛利','盤/調','盤調採購'];
+    const MONTHLY_SOLD_WIDTHS=[4,8,8,8,5,7,11,9,9,5,9,9,10,10,10,7];
+    const MONTHLY_SWAP_WIDTHS=[4,8,8,8,5,7,10,9,9,5,9,9,9,7,9,7,9];
+    let monthlyReportSnapshot=null;
+    function monthlyReportMonth(){return document.getElementById('monthlySalesMonth').value||new Date().toLocaleDateString('en-CA').slice(0,7)}
+    function monthlyReportData(month){
+      const sold=salesRecords.map(normalizeSale).filter(r=>r.status==='已完成'&&String(r.deliveryDate||r.orderDate||'').slice(0,7)===month).sort((a,b)=>String(a.deliveryDate||a.orderDate||'').localeCompare(String(b.deliveryDate||b.orderDate||'')));
+      const swaps=inventoryRecords.filter(r=>r.status==='已確認'&&String(r.date||'').slice(0,7)===month).sort((a,b)=>String(a.date||'').localeCompare(String(b.date||'')));
+      return {month,sold,swaps};
+    }
+    function monthlyDate(value){const m=String(value||'').match(/^\d{4}-(\d{2})-(\d{2})/);return m?`${Number(m[1])}月${Number(m[2])}日`:String(value||'')}
+    function monthlyAmount(value){const n=Number(value);return Number.isFinite(n)?Math.round(n).toLocaleString('zh-TW'):''}
+    function monthlySoldRows(data){return data.sold.map((r,i)=>[i+1,monthlyDate(r.orderDate),monthlyDate(r.fundingDate),monthlyDate(r.deliveryDate),r.vehicle?.year||'',r.vehicle?.brand||'',r.vehicle?.model||'',r.vehicle?.plate||'',r.newPlate||'',r.vehicle?.color||'',Number(r.vehicle?.purchase||0),Number(r.prepCost||0),Number(r.totalCost||0),Number(r.receivedAmount||0),Number(r.profit||0),r.employee?.name||''])}
+    function monthlySwapRows(data){return data.swaps.map((r,i)=>[i+1,monthlyDate(r.date),monthlyDate(linkedInventoryVehicle(r)?.deliveryDate),r.paymentMethod||'',r.year||'',r.brand||'',r.model||'',r.plate||'',r.newPlate||'',r.color||'',Number(r.totalCost||0),r.receivedAmount==null?'':Number(r.receivedAmount)||'',r.source||'',r.purchaser||'',r.actualProfit==null?'':Number(r.actualProfit)||'',r.adjustmentLabel||'',r.adjustmentPurchase||''])}
+    function monthlyColumns(kind){return kind==='sold'?{headers:MONTHLY_SOLD_HEADERS,widths:MONTHLY_SOLD_WIDTHS,nums:new Set([10,11,12,13,14])}:{headers:MONTHLY_SWAP_HEADERS,widths:MONTHLY_SWAP_WIDTHS,nums:new Set([10,11,14])}}
+    function monthlyTitle(month,kind){const short=getERPCompanyName().replace(/國際車業$/,'');return `${rocMonthText(month)}${short}${kind==='sold'?'紀錄表':'盤調紀錄表'}`}
+    function monthlyReportSections(data){const parts=[];for(const kind of ['sold','swap']){const rows=kind==='sold'?monthlySoldRows(data):monthlySwapRows(data),step=18;for(let i=0;i<Math.max(rows.length,1);i+=step){parts.push({kind,month:data.month,rows:rows.slice(i,i+step),allRows:rows,last:i+step>=rows.length})}}return parts}
+    function monthlyCell(value,numeric){return escapeHtml(numeric&&value!==''?monthlyAmount(value):String(value??''))}
+    function monthlyReportHtml(data){return monthlyReportSections(data).map(part=>{const {headers,widths,nums}=monthlyColumns(part.kind),total=part.kind==='sold'?[10,11,12,13,14]:[10,11,14],cols=widths.map(w=>`<col style="width:${w/widths.reduce((a,b)=>a+b,0)*100}%">`).join('');const row=(values,tag)=>`<tr>${values.map((v,i)=>`<${tag} class="${i===0?'monthly-ordinal ':''}${nums.has(i)?'monthly-number':''}">${monthlyCell(v,tag==='td'&&nums.has(i))}</${tag}>`).join('')}</tr>`;const sums=headers.map((_,i)=>total.includes(i)?part.allRows.reduce((sum,r)=>sum+Number(r[i]||0),0):i===0?'合計':'');return `<div class="monthly-report-page"><table class="monthly-report-table"><colgroup>${cols}</colgroup><thead><tr><th class="monthly-title" colspan="${headers.length}">${escapeHtml(monthlyTitle(part.month,part.kind))}</th></tr>${row(headers,'th')}</thead><tbody>${part.rows.length?part.rows.map(r=>row(r,'td')).join(''):`<tr><td colspan="${headers.length}" class="monthly-empty">本月無${part.kind==='sold'?'已完成銷售':'已確認盤調'}資料</td></tr>`}${part.last?`<tr class="monthly-totals">${sums.map((v,i)=>`<td class="${total.includes(i)?'monthly-number':''}">${total.includes(i)?monthlyAmount(v):monthlyCell(v,false)}</td>`).join('')}</tr>`:''}</tbody></table></div>`}).join('')}
+    function previewMonthlySalesReport(){const data=monthlyReportData(monthlyReportMonth());monthlyReportSnapshot=data;document.getElementById('monthlySalesReportContent').innerHTML=monthlyReportHtml(data);document.getElementById('monthlySalesReportModal').classList.add('open')}
+    function closeMonthlySalesReport(){document.getElementById('monthlySalesReportModal').classList.remove('open')}
+    async function downloadMonthlySalesPdf(){
+      const data=monthlyReportSnapshot||monthlyReportData(monthlyReportMonth()),host=document.getElementById('monthlySalesReportContent');host.innerHTML=monthlyReportHtml(data);
+      if(!window.jspdf||!window.html2canvas)return alert('PDF 元件未載入，請確認網路連線並重新整理。');
+      const button=document.getElementById('monthlySalesPdfButton'),old=button.textContent;button.disabled=true;button.textContent='PDF 產生中…';
+      try{if(document.fonts)await document.fonts.ready;const pdf=new window.jspdf.jsPDF('l','mm','a4'),pages=[...host.querySelectorAll('.monthly-report-page')];
+        for(let i=0;i<pages.length;i++){const page=pages[i],canvas=await html2canvas(page,{scale:2.5,backgroundColor:'#fff',logging:false,windowWidth:1250});const ctx=canvas.getContext('2d'),base=page.getBoundingClientRect(),factor=canvas.width/base.width;ctx.save();ctx.strokeStyle='#222';ctx.lineWidth=Math.max(2,factor*.65);for(const cell of page.querySelectorAll('th,td')){const box=cell.getBoundingClientRect();ctx.strokeRect((box.left-base.left)*factor,(box.top-base.top)*factor,box.width*factor,box.height*factor)}ctx.restore();const ratio=Math.min(283/canvas.width,196/canvas.height);if(i)pdf.addPage('a4','l');pdf.addImage(canvas.toDataURL('image/png'),'PNG',7,7,canvas.width*ratio,canvas.height*ratio,undefined,'FAST')}
+        pdf.save(`月銷售紀錄表_${data.month}.pdf`);
+      }catch(error){console.error('月銷售紀錄表 PDF 失敗',error);alert('PDF 產生失敗，請重新整理後再試。')}finally{button.disabled=false;button.textContent=old}
+    }
+    async function downloadMonthlySalesExcel(){
+      if(!window.ExcelJS)return alert('Excel 格式元件未載入，請確認網路連線並重新整理。');const data=monthlyReportSnapshot||monthlyReportData(monthlyReportMonth()),wb=new ExcelJS.Workbook(),sheet=wb.addWorksheet('月銷售紀錄表');
+      sheet.columns=MONTHLY_SWAP_WIDTHS.map(width=>({width}));
+      for(const kind of ['sold','swap']){
+        const {headers,nums}=monthlyColumns(kind),values=kind==='sold'?monthlySoldRows(data):monthlySwapRows(data),titleRow=sheet.rowCount+1;
+        sheet.addRow([monthlyTitle(data.month,kind)]);sheet.mergeCells(titleRow,1,titleRow,headers.length);sheet.addRow(headers);
+        for(const valuesRow of values)sheet.addRow(valuesRow);
+        if(!values.length)sheet.addRow([]);
+        const totalIndexes=kind==='sold'?[10,11,12,13,14]:[10,11,14],sum=Array(headers.length).fill('');sum[0]='合計';
+        for(const c of totalIndexes)sum[c]=values.reduce((n,r)=>n+Number(r[c]||0),0);
+        const totalRow=sheet.addRow(sum);sheet.getRow(titleRow).height=29;sheet.getRow(titleRow+1).height=24;
+        for(let rowNo=titleRow;rowNo<=totalRow.number;rowNo++){
+          const row=sheet.getRow(rowNo);if(rowNo>titleRow+1)row.height=23;
+          for(let col=1;col<=headers.length;col++){
+            const cell=row.getCell(col),idx=col-1,isTotal=rowNo===totalRow.number;
+            cell.font={name:'Microsoft JhengHei',size:rowNo===titleRow?13:10,color:{argb:isTotal?'FFFF0000':'FF000000'}};
+            cell.alignment={horizontal:rowNo<=titleRow+1||idx===0?'center':nums.has(idx)?'right':'center',vertical:'middle',shrinkToFit:true};
+            cell.border={top:{style:'thin'},bottom:{style:'thin'},left:{style:'thin'},right:{style:'thin'}};
+            if(rowNo===titleRow)cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFCCCCFF'}};
+            else if(rowNo>titleRow+1&&!isTotal&&idx===0)cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:kind==='sold'?'FFFFFF99':'FFCCCCFF'}};
+            if(rowNo>titleRow+1&&nums.has(idx))cell.numFmt='#,##0;[Red]-#,##0;0';
+          }
+        }
+      }
+      sheet.pageSetup={paperSize:9,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0,margins:{left:0.18,right:0.18,top:0.2,bottom:0.2,header:0,footer:0}};
+      sheet.printArea=`A1:Q${sheet.rowCount}`;sheet.views=[{state:'frozen',ySplit:2}];
+      try{const bytes=await wb.xlsx.writeBuffer(),url=URL.createObjectURL(new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})),link=document.createElement('a');link.href=url;link.download=`月銷售紀錄表_${data.month}.xlsx`;link.click();setTimeout(()=>URL.revokeObjectURL(url),60000)}catch(error){console.error('月銷售紀錄表 Excel 失敗',error);alert('Excel 產生失敗，請重新整理後再試。')}
+    }
+
     initBrandOptions();
     renderCostCategoryOptions();
     renderCostManagement();
@@ -1816,6 +1890,7 @@
     syncAllSalesCommissionsToPayroll();
     renderPayroll();
     renderSales();
+    document.getElementById("monthlySalesMonth").value=new Date().toLocaleDateString("en-CA").slice(0,7);
     renderInventoryRecords();
     renderAccounting();
     renderDashboard();
