@@ -215,16 +215,16 @@
     /* 薪資總表：附件的 21 欄橫式 A4 版型 */
     #payrollSummaryContent{display:flex;flex-direction:column;align-items:center;gap:18px}
     .payroll-summary-page{width:1350px;max-width:none;background:#fff;padding:20px 16px;box-shadow:0 2px 18px #0002;box-sizing:border-box}
-    .payroll-summary-table{width:100%;border-collapse:collapse;table-layout:fixed;font:10px Arial,"Noto Sans TC",sans-serif;color:#000}
-    .payroll-summary-table th,.payroll-summary-table td{border:1px solid #000;padding:7px 2px;white-space:normal;overflow-wrap:anywhere;vertical-align:middle;text-align:right;height:29px}
+    .payroll-summary-table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;font:10px Arial,"Noto Sans TC",sans-serif;color:#000;border-right:1px solid #000;border-bottom:1px solid #000}
+    .payroll-summary-table th,.payroll-summary-table td{border:0;border-top:1px solid #000;border-left:1px solid #000;padding:7px 2px;white-space:normal;overflow-wrap:anywhere;vertical-align:middle;text-align:right;height:29px}
     .payroll-summary-table thead th{text-align:center;font-weight:400;height:40px}
     .payroll-summary-table .summary-title{font-weight:bold;font-size:16px;height:37px;border-bottom:0}
     .payroll-summary-table tbody td:nth-child(-n+3){text-align:center}
     .payroll-summary-table tbody td:last-child{text-align:left}
     .payroll-summary-table .salary-white{background:#fff}
     .payroll-summary-table .salary-highlight{background:#ffcc99}
-    .payroll-summary-table .summary-total td{font-weight:bold;color:#008000;border-left:0;border-right:0;border-bottom:0;background:#fff;text-align:right}
-    .payroll-summary-table .summary-total td:first-child{text-align:center;border-left:2px solid #000}
+    .payroll-summary-table .summary-total td{font-weight:bold;color:#008000;background:#fff;text-align:right;border-top:1px solid #000;border-left:1px solid #000}
+    .payroll-summary-table .summary-total td:first-child{text-align:center}
     #payrollSummaryModal .report-preview-wrap{overflow:auto;max-height:75vh}
 </style>
 </head>
@@ -1381,7 +1381,29 @@
     function payrollSummaryTableHtml(){return payrollSummaryPages().map(page=>{const totals=Array.from({length:21},(_,c)=>c>=3&&c<=19?page.allRows.reduce((s,row)=>s+Number(row[c]||0),0):'');const cells=(values,kind)=>values.map((v,c)=>`<${kind} class="${c===3||c===4?'salary-highlight ':''}${[0,1,2,5,8,9].includes(c)?'salary-white':''}">${escapeHtml(typeof v==='number'?(v===0?'':v.toLocaleString('zh-TW')):String(v||''))}</${kind}>`).join('');return `<div class="payroll-summary-page"><table class="payroll-summary-table"><colgroup>${PAYROLL_SUMMARY_WIDTHS.map(w=>`<col style="width:${w/PAYROLL_SUMMARY_WIDTHS.reduce((a,b)=>a+b,0)*100}%">`).join('')}</colgroup><thead><tr><th colspan="21" class="summary-title">${escapeHtml(payrollSummaryTitle(page.month))}</th></tr><tr>${cells(PAYROLL_SUMMARY_HEADERS,'th')}</tr></thead><tbody>${page.rows.map(row=>`<tr>${cells(row,'td')}</tr>`).join('')}${page.last?`<tr class="summary-total"><td colspan="3">實發金額總計：</td>${totals.slice(3).map((v,i)=>`<td class="${i===0||i===1?'salary-highlight ':''}${[2,5,6].includes(i)?'salary-white':''}">${v===''?'':Number(v).toLocaleString('zh-TW')}</td>`).join('')}</tr>`:''}</tbody></table></div>`}).join('')}
     function previewPayrollSummary(){if(!filteredPayrollList().length)return alert('目前沒有符合篩選條件的薪資資料。');document.getElementById('payrollSummaryContent').innerHTML=payrollSummaryTableHtml();document.getElementById('payrollSummaryModal').classList.add('open')}
     function closePayrollSummary(){document.getElementById('payrollSummaryModal').classList.remove('open')}
-    async function downloadPayrollSummaryPdf(){if(!filteredPayrollList().length)return alert('目前沒有符合篩選條件的薪資資料。');const container=document.getElementById('payrollSummaryContent');container.innerHTML=payrollSummaryTableHtml();if(document.fonts)await document.fonts.ready;const {jsPDF}=window.jspdf,pdf=new jsPDF('l','mm','a4');for(const [i,page] of [...container.querySelectorAll('.payroll-summary-page')].entries()){const canvas=await html2canvas(page,{scale:2,useCORS:true,backgroundColor:'#fff',logging:false,windowWidth:1350});if(i)pdf.addPage('a4','l');pdf.addImage(canvas.toDataURL('image/png'),'PNG',6,6,285,Math.min(198,285*canvas.height/canvas.width),undefined,'FAST')}pdf.save(`薪資總表_${document.getElementById('payrollMonthFilter').value||new Date().toISOString().slice(0,10)}.pdf`)}
+    async function downloadPayrollSummaryPdf(){
+      if(!filteredPayrollList().length)return alert('目前沒有符合篩選條件的薪資資料。');
+      const container=document.getElementById('payrollSummaryContent');
+      container.innerHTML=payrollSummaryTableHtml();
+      if(document.fonts)await document.fonts.ready;
+      const {jsPDF}=window.jspdf,pdf=new jsPDF('l','mm','a4');
+      for(const [i,page] of [...container.querySelectorAll('.payroll-summary-page')].entries()){
+        const canvas=await html2canvas(page,{scale:3,useCORS:true,backgroundColor:'#fff',logging:false,windowWidth:1350});
+        // html2canvas 偶爾會漏畫極細的表格線；依實際儲存格位置補畫完整格線。
+        const ctx=canvas.getContext('2d'),origin=page.getBoundingClientRect(),scale=canvas.width/origin.width;
+        ctx.save();ctx.strokeStyle='#000';ctx.lineWidth=Math.max(2,scale);
+        for(const cell of page.querySelectorAll('.payroll-summary-table th,.payroll-summary-table td')){
+          const rect=cell.getBoundingClientRect();
+          ctx.strokeRect((rect.left-origin.left)*scale,(rect.top-origin.top)*scale,rect.width*scale,rect.height*scale);
+        }
+        ctx.restore();
+        // 寬與高一起等比例縮放，避免資料較多時 PDF 下方被裁掉。
+        const ratio=Math.min(285/canvas.width,198/canvas.height);
+        if(i)pdf.addPage('a4','l');
+        pdf.addImage(canvas.toDataURL('image/png'),'PNG',6,6,canvas.width*ratio,canvas.height*ratio,undefined,'FAST');
+      }
+      pdf.save(`薪資總表_${document.getElementById('payrollMonthFilter').value||new Date().toISOString().slice(0,10)}.pdf`);
+    }
     async function downloadPayrollSummaryExcel(){const groups=payrollSummaryGroups();if(!groups.length)return alert('目前沒有符合篩選條件的薪資資料。');if(!window.ExcelJS)return alert('Excel 格式元件未載入，請確認網路連線並重新整理。');const wb=new ExcelJS.Workbook();for(const [month,list] of groups){const sheet=wb.addWorksheet(month.slice(0,31),{views:[{state:'frozen',ySplit:2}]});sheet.columns=PAYROLL_SUMMARY_WIDTHS.map(width=>({width}));sheet.mergeCells('A1:U1');sheet.getCell('A1').value=payrollSummaryTitle(month);sheet.getRow(1).height=30;sheet.addRow(PAYROLL_SUMMARY_HEADERS);sheet.getRow(2).height=34;list.forEach((r,i)=>sheet.addRow(payrollSummaryValues(r,i)));const totalRow=sheet.addRow(['實發金額總計：','','',...Array.from({length:17},(_,i)=>list.reduce((sum,r,j)=>sum+Number(payrollSummaryValues(r,j)[i+3]||0),0)),'']);sheet.mergeCells(totalRow.number,1,totalRow.number,3);totalRow.height=25;const border={top:{style:'thin',color:{argb:'FF000000'}},bottom:{style:'thin',color:{argb:'FF000000'}},left:{style:'thin',color:{argb:'FF000000'}},right:{style:'thin',color:{argb:'FF000000'}}};for(let rowNo=1;rowNo<=totalRow.number;rowNo++){const row=sheet.getRow(rowNo);if(rowNo>2&&rowNo<totalRow.number)row.height=23;for(let col=1;col<=21;col++){const cell=row.getCell(col),white=[1,2,3,6,9,10].includes(col);cell.font={name:'Arial',size:rowNo===1?11:10,bold:rowNo===1||rowNo===totalRow.number,color:{argb:rowNo===totalRow.number?'FF008000':'FF000000'}};cell.alignment={horizontal:rowNo<=2?'center':col<=3?'center':col===21?'left':'right',vertical:'middle',wrapText:rowNo===2||col===21};if(rowNo>1)cell.border=border;if(rowNo>1&&rowNo<totalRow.number&&col>=4&&col<=20)cell.numFmt='#,##0;[Red]-#,##0;';if(rowNo===totalRow.number&&col>=4&&col<=20)cell.numFmt='#,##0;[Red]-#,##0;0';if(rowNo>1&&rowNo<totalRow.number&&(white||col===4||col===5))cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:rowNo>2&&(col===4||col===5)?'FFFFCC99':'FFFFFFFF'}}}}sheet.pageSetup={paperSize:9,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0,printTitlesRow:'1:2',margins:{left:0.2,right:0.2,top:0.25,bottom:0.25,header:0.1,footer:0.1}};sheet.printOptions={horizontalCentered:true};sheet.printArea=`A1:U${totalRow.number}`}const bytes=await wb.xlsx.writeBuffer(),url=URL.createObjectURL(new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})),a=document.createElement('a');a.href=url;a.download=`薪資總表_${document.getElementById('payrollMonthFilter').value||new Date().toISOString().slice(0,10)}.xlsx`;a.click();setTimeout(()=>URL.revokeObjectURL(url),60000)}
 
 
