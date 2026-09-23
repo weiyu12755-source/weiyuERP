@@ -1845,31 +1845,23 @@
     const PROFIT_LOSS_WIDTHS=[4,9,5,12,9,9,5,10,9,10,10,10,10,8,10,7,7,9,9,8,11,8];
     const PROFIT_LOSS_MONEY=new Set([7,8,9,10,11,12,13,14,17,18,20]);
     let profitLossSnapshot=null;
-    // 舊資料可能帶有千分位字串或無效金額，避免任一欄傳出 NaN 連帶污染小計與匯出。
-    function profitLossNumber(value){const n=typeof value==='string'?Number(value.replace(/[,，\s]/g,'')):Number(value);return Number.isFinite(n)?n:0}
     function profitLossData(month=accountingSelectedMonth()){
       const records=salesRecords.map(normalizeSale).filter(r=>r.status==='已完成'&&String(r.deliveryDate||r.fundingDate||r.orderDate||'').slice(0,7)===month).sort((a,b)=>String(a.deliveryDate||a.fundingDate||a.orderDate||'').localeCompare(String(b.deliveryDate||b.fundingDate||b.orderDate||'')));
       const rows=records.map((r,i)=>{
-        const v=r.vehicle||{},purchase=profitLossNumber(v.purchase);
-        const entries=Array.isArray(v.costEntries)?v.costEntries:[];
-        const doingEntries=entries.filter(e=>String(e.category||'').trim()==='做成本');
-        const doing=doingEntries.length?doingEntries.reduce((sum,e)=>sum+profitLossNumber(e.amount),0):profitLossNumber(v.preparationCost);
-        const normalizedCost=Number(r.totalCost),cost=Number.isFinite(normalizedCost)?normalizedCost:purchase+entries.reduce((sum,e)=>sum+profitLossNumber(e.amount),0);
-        const preparation=cost-purchase-doing;
-        const originalSale=salesRecords.find(item=>item.id===r.id)||{};
-        const normalizedReceived=Number(r.receivedAmount),received=Number.isFinite(normalizedReceived)?normalizedReceived:profitLossNumber(originalSale.receivedAmount??originalSale.salePrice??r.salePrice);
-        const profit=received-cost,tax=profitLossNumber(Number.isFinite(Number(r.taxAmount))?r.taxAmount:originalSale.taxAmount),afterTax=profit-tax;
-        const rate=profitLossNumber(r.commissionRate),bonus=profitLossNumber(r.commission)+profitLossNumber(r.managerCommission),intro=profitLossNumber(r.referrerCommission);
-        const share=Number.isFinite(Number(r.companyOwnershipRate))?Number(r.companyOwnershipRate):1,gross=afterTax*share-bonus-intro-profitLossNumber(r.educationFund)*share;
+        const v=r.vehicle||{},purchase=Number(v.purchase||0),doing=reportCategoryAmount(v,['做成本'],'preparationCost');
+        const cost=Number(r.totalCost||0),preparation=cost-purchase-doing,received=Number(r.receivedAmount||0);
+        const profit=received-cost,tax=Number(r.taxAmount||0),afterTax=profit-tax;
+        const rate=Number(r.commissionRate||0),bonus=Number(r.commission||0)+Number(r.managerCommission||0),intro=Number(r.referrerCommission||0);
+        const share=Number(r.companyOwnershipRate??1),gross=afterTax*share-bonus-intro-Number(r.educationFund||0)*share;
         return [i+1,v.stockDate||'',v.year||'',`${v.brand||''} ${v.model||''}`.trim(),v.plate||'',r.newPlate||v.newPlate||'',v.color||'',purchase,doing,preparation,cost,received,profit,tax,afterTax,r.employee?.name||'',rate?rate/100:bonus?'固獎':'',bonus,intro,r.referrerName||'',gross,purchase?gross/purchase:0];
       });
-      const sums=Array(22).fill('');sums[0]='合計';for(const i of PROFIT_LOSS_MONEY)sums[i]=rows.reduce((n,r)=>n+profitLossNumber(r[i]),0);
+      const sums=Array(22).fill('');sums[0]='合計';for(const i of PROFIT_LOSS_MONEY)sums[i]=rows.reduce((n,r)=>n+Number(r[i]||0),0);
       sums[15]=rows.length;const rates=rows.map(r=>r[16]).filter(x=>typeof x==='number');sums[16]=rates.length?rates.reduce((a,b)=>a+b,0)/rates.length:'';
-      sums[21]=sums[7]?sums[20]/sums[7]:0;
+      sums[21]=Number(sums[7])?Number(sums[20])/Number(sums[7]):0;
       return {month,rows,sums};
     }
     function profitLossSections(data){const sections=[];for(let i=0;i<Math.max(1,data.rows.length);i+=15)sections.push({rows:data.rows.slice(i,i+15),last:i+15>=data.rows.length});return sections}
-    function profitLossDisplay(value,col){if(value===''||value==null)return '';if(col===16||col===21)return typeof value==='number'?`${(profitLossNumber(value)*100).toFixed(2).replace(/\.00$/,'')}%`:escapeHtml(value);if(PROFIT_LOSS_MONEY.has(col))return profitLossNumber(value).toLocaleString('zh-TW',{maximumFractionDigits:2});return escapeHtml(value)}
+    function profitLossDisplay(value,col){if(value===''||value==null)return '';if(col===16||col===21)return typeof value==='number'?`${(value*100).toFixed(2).replace(/\.00$/,'')}%`:escapeHtml(value);if(PROFIT_LOSS_MONEY.has(col))return Number(value).toLocaleString('zh-TW',{maximumFractionDigits:2});return escapeHtml(value)}
     function profitLossHtml(data){const widths=PROFIT_LOSS_WIDTHS,cols=widths.map(w=>`<col style="width:${w/widths.reduce((a,b)=>a+b,0)*100}%">`).join('');const row=(values,tag,cls='')=>`<tr class="${cls}">${values.map((v,i)=>`<${tag} class="${PROFIT_LOSS_MONEY.has(i)||i===16||i===21?'profit-loss-num':''}">${profitLossDisplay(v,i)}</${tag}>`).join('')}</tr>`;
       return profitLossSections(data).map(section=>`<div class="profit-loss-page"><table class="profit-loss-table"><colgroup>${cols}</colgroup><thead><tr><th class="profit-loss-title" colspan="22">${escapeHtml(getERPCompanyName())}　${escapeHtml(data.month)} 損益表</th></tr>${row(PROFIT_LOSS_HEADERS,'th','profit-loss-heading')}</thead><tbody>${section.rows.length?section.rows.map(r=>row(r,'td')).join(''):'<tr><td colspan="22" style="height:38px">本月無已完成銷售資料</td></tr>'}${section.last?`${row(PROFIT_LOSS_SUMMARY,'th','profit-loss-summary')}${row(data.sums,'td','profit-loss-total')}`:''}</tbody></table></div>`).join('')}
     function previewProfitLossReport(){profitLossSnapshot=profitLossData();document.getElementById('profitLossReportContent').innerHTML=profitLossHtml(profitLossSnapshot);document.getElementById('profitLossReportModal').classList.add('open')}
