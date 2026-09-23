@@ -1859,15 +1859,17 @@
       sheet.columns=MONTHLY_SWAP_WIDTHS.map(width=>({width}));
       for(const kind of ['sold','swap']){
         const {headers,nums}=monthlyColumns(kind),values=kind==='sold'?monthlySoldRows(data):monthlySwapRows(data),titleRow=sheet.rowCount+1;
-        sheet.addRow([monthlyTitle(data.month,kind)]);sheet.mergeCells(titleRow,1,titleRow,headers.length);sheet.addRow(headers);
+        sheet.addRow([monthlyTitle(data.month,kind)]);sheet.mergeCells(titleRow,1,titleRow,MONTHLY_SWAP_HEADERS.length);sheet.addRow(headers);
         for(const valuesRow of values)sheet.addRow(valuesRow);
         if(!values.length)sheet.addRow([]);
         const totalIndexes=kind==='sold'?[10,11,12,13,14]:[10,11,14],sum=Array(headers.length).fill('');sum[0]='合計';
         for(const c of totalIndexes)sum[c]=values.reduce((n,r)=>n+Number(r[c]||0),0);
         const totalRow=sheet.addRow(sum);sheet.getRow(titleRow).height=29;sheet.getRow(titleRow+1).height=24;
+        // 售出表比盤調表少一欄：合併最後兩格，讓兩段表格都延伸至 Q 欄。
+        if(kind==='sold')for(let rowNo=titleRow+1;rowNo<=totalRow.number;rowNo++)sheet.mergeCells(rowNo,16,rowNo,17);
         for(let rowNo=titleRow;rowNo<=totalRow.number;rowNo++){
           const row=sheet.getRow(rowNo);if(rowNo>titleRow+1)row.height=23;
-          for(let col=1;col<=headers.length;col++){
+          for(let col=1;col<=MONTHLY_SWAP_HEADERS.length;col++){
             const cell=row.getCell(col),idx=col-1,isTotal=rowNo===totalRow.number;
             cell.font={name:'Microsoft JhengHei',size:rowNo===titleRow?13:10,color:{argb:isTotal?'FFFF0000':'FF000000'}};
             cell.alignment={horizontal:rowNo<=titleRow+1||idx===0?'center':nums.has(idx)?'right':'center',vertical:'middle',shrinkToFit:true};
