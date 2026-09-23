@@ -369,6 +369,7 @@
     <div class="detail-section">新車主／出庫資料</div><div class="field"><label>交車日期</label><input id="deliveryDate" type="date" onchange="autoSoldStatus()"></div><div class="field"><label>新車主姓名</label><input id="newOwnerName" oninput="autoSoldStatus()"></div><div class="field"><label>新車主電話</label><input id="newOwnerPhone"></div><div class="field"><label>新車主身分證</label><input id="newOwnerId"></div><div class="field"><label>新車主生日（民國）</label><div class="roc-date-group"><input id="newOwnerBirthRocYear" type="number" min="1" max="200" placeholder="年"><span>年</span><select id="newOwnerBirthMonth"></select><span>月</span><select id="newOwnerBirthDay"></select><span>日</span></div><input id="newOwnerBirth" type="hidden"></div><div class="field"><label>狀態</label><select id="vehicleStatus"><option>盤整中</option><option>銷售中</option><option>已售出</option></select></div>
     <div class="detail-section">車輛成本</div>
     <div class="field"><label>進價</label><input id="purchasePrice" type="number" placeholder="0" oninput="updateTotalPreview();updateJointInvestmentPreview()"></div>
+    <div class="field"><label>做成本</label><input id="preparationCost" type="number" value="0" min="0" placeholder="0" oninput="updateTotalPreview()"></div>
     <div class="field"><label>車輛持有方式</label><select id="vehicleOwnershipType" onchange="updateJointInvestmentPreview()"><option value="自有">公司自有 100%</option><option value="同行合資">同行合資</option></select></div>
     <div class="field"><label>同行車行／合資對象</label><input id="jointPartnerName" placeholder="例如：XX車業" oninput="updateJointInvestmentPreview()"></div>
     <div class="field"><label>公司出資本金</label><input id="companyInvestment" type="number" min="0" placeholder="0" oninput="updateJointInvestmentPreview()"></div>
@@ -388,7 +389,6 @@
     <div class="field"><label>教育基金</label><input id="educationFund" type="number" placeholder="0" oninput="updateTotalPreview()"></div>
     <div class="field"><label>管銷</label><input id="overhead" type="number" value="10000" oninput="updateTotalPreview()"></div>
     <div class="field"><label>採購獎金</label><input id="purchaseBonus" type="number" value="2000" oninput="updateTotalPreview()"></div>
-    <div class="field"><label>做成本</label><input id="preparationCost" type="number" value="0" min="0" placeholder="0" oninput="updateTotalPreview()"></div>
     <div class="field"><label>總成本</label><input id="totalCostPreview" class="total-cost" disabled></div>
     <div class="field span-3"><label>備註</label><textarea id="note" rows="3"></textarea></div>
     <div class="field span-3"><label>紀錄</label><textarea id="vehicleRecord" rows="3"></textarea></div>
