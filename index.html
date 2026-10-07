@@ -1466,8 +1466,8 @@ try{const j=JSON.parse(localStorage.getItem('weiyuCostCorrectionCommitted')||'nu
         win.focus();win.print();
       }catch(e){if(!win.closed)win.close();console.error(e);alert('薪資單列印準備失敗，請稍後重試。')}
     }
-    // Excel uses the PDF's column proportions. Extra boundaries allow the four
-    // equal metadata fields and the differently sized footer panels to align exactly.
+    // Excel sizes detail columns to their headers and actual contents. Extra
+    // boundaries preserve the merged metadata and footer panels.
     function payslipExcelSheetName(r,used){
       const base=((r.employeeName||'員工')+'_'+(r.month||'月份')).replace(/[\\/:?*\[\]\x00-\x1f]/g,'_').replace(/^'+|'+$/g,'')||'薪資單';
       let name=base.slice(0,31),n=2;
@@ -1475,13 +1475,30 @@ try{const j=JSON.parse(localStorage.getItem('weiyuCostCorrectionCommitted')||'nu
       used.add(name.toLowerCase());return name;
     }
     function makePayslipSheet(r,wb,name='薪資單'){
-      const widths=[75,36,36,75,36,60,65,95,95,95,95,61,95,61,95],total=widths.reduce((s,w)=>s+w,0);
+      const items=r.commissionItems||[],deductions=[...payslipFixedDeductions(r),...payslipAdjustmentRows(r,'扣項')],bonuses=[...payslipFixedBonuses(r),...payslipAdjustmentRows(r,'加項')];
+      const headers=['日期','類別','年份','車款','顏色','車號','客戶','消訂金','貸款佣金','銷售佣金','採購獎金','項目','金額','項目','金額'];
+      const widths=[112,52,64,100,56,100,100,108,108,108,108,100,108,100,108];
+      // CJK characters occupy about twice the width of Latin characters. Leave
+      // padding for bold headers, formatted amounts and Excel font differences.
+      const textWidth=value=>Math.max(0,...String(value??'').split('\n').map(line=>[...line].reduce((sum,ch)=>sum+(ch.codePointAt(0)>255?15:8.5),0)))+20;
+      const amountText=value=>Math.round(Number(value||0)).toLocaleString('en-US');
+      const fit=(column,value)=>{widths[column]=Math.max(widths[column],Math.ceil(textWidth(value)))};
+      headers.forEach((value,column)=>fit(column,value));
+      items.forEach(x=>{
+        [x.date,x.category,x.year,x.model,x.color,x.plate,x.customer].forEach((value,column)=>fit(column,value));
+        ['cancelDeposit','loanCommission','salesCommission','purchaseBonus'].forEach((key,i)=>fit(7+i,amountText(x[key])));
+      });
+      deductions.forEach(x=>{fit(11,x[0]);fit(12,amountText(x[1]))});
+      bonuses.forEach(x=>{fit(13,x[0]);fit(14,amountText(x[1]))});
+      const total=widths.reduce((s,w)=>s+w,0);
       const edges=[0];widths.forEach(w=>edges.push(edges[edges.length-1]+w));
       const meta=[0,total/4,total/2,total*3/4,total],summary=[0,total*3/13,total*6/13,total*9/13,total],footer=[0,total*9/15,total*12/15,total];
       const stops=[...new Set([...edges,...meta,...summary,...footer])].sort((a,b)=>a-b);
       const col=x=>stops.indexOf(x)+1,last=stops.length-1;
       const ws=wb.addWorksheet(name,{views:[{showGridLines:false}]});
-      ws.columns=stops.slice(1).map((x,i)=>{const px=x-stops[i];return {width:px<12?px/12:(px-5)/7}});
+      // Do not subtract padding from every hidden subdivision: those losses
+      // accumulate inside merged cells and make their visible columns too narrow.
+      ws.columns=stops.slice(1).map((x,i)=>({width:Math.ceil((x-stops[i])/7*100)/100}));
       const black={style:'thin',color:{argb:'FF000000'}},font={name:'微軟正黑體',size:10,color:{argb:'FF111111'}};
       // Set each merged rectangle's perimeter after merging, including blank cells.
       function panel(row,left,right,value,options={}){
@@ -1492,7 +1509,7 @@ try{const j=JSON.parse(localStorage.getItem('weiyuCostCorrectionCommitted')||'nu
         cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:options.fill||'FFFFFFFF'}};
         if(options.numFmt)cell.numFmt=options.numFmt;
         if(options.border!==false)for(let c=c1;c<=c2;c++)ws.getCell(row,c).style={...cell.style,border:{top:black,bottom:black,...(c===c1?{left:black}:{}),...(c===c2?{right:black}:{})}};
-        const size=cell.font.size||10,capacity=Math.max(1,(right-left-8)/size),text=typeof value==='number'?String(Math.round(value)):String(value??'');
+        const size=cell.font.size||10,capacity=Math.max(1,(right-left-20)/(size*96/72)),text=typeof value==='number'?String(Math.round(value)):String(value??'');
         const lines=text.split('\n').reduce((sum,line)=>sum+Math.max(1,Math.ceil([...line].reduce((n,ch)=>n+(ch.charCodeAt(0)>255?1:0.55),0)/capacity)),0);
         ws.getRow(row).height=Math.max(ws.getRow(row).height||0,options.height||23,lines*size*1.25+9);
         return cell;
@@ -1505,8 +1522,7 @@ try{const j=JSON.parse(localStorage.getItem('weiyuCostCorrectionCommitted')||'nu
       panel(4,0,edges[11],'銷售佣金試算 - '+Number(r.salesCommissionRate||30)+' %',{font:{bold:true,size:11},height:29});
       panel(4,edges[11],edges[13],'扣款項目金額',{font:{bold:true,size:11}});
       panel(4,edges[13],total,'各項補助獎金',{font:{bold:true,size:11}});
-      ['日期','類別','年份','車款','顏色','車號','客戶','消訂金','貸款佣金','銷售佣金','採購獎金','項目','金額','項目','金額'].forEach((v,i)=>panel(5,edges[i],edges[i+1],v,{font:{bold:true},height:25}));
-      const items=r.commissionItems||[],deductions=[...payslipFixedDeductions(r),...payslipAdjustmentRows(r,'扣項')],bonuses=[...payslipFixedBonuses(r),...payslipAdjustmentRows(r,'加項')];
+      headers.forEach((v,i)=>panel(5,edges[i],edges[i+1],v,{font:{bold:true},height:25}));
       const count=Math.max(11,items.length,deductions.length,bonuses.length);
       for(let i=0;i<count;i++){
         const x=items[i]||{},d=deductions[i]||[],b=bonuses[i]||[];
