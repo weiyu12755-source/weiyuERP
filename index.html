@@ -1174,7 +1174,7 @@ try{const j=JSON.parse(localStorage.getItem('weiyuCostCorrectionCommitted')||'nu
     let yardSelectedIds=new Set();
     function yardAvailableVehicles(){
       return vehicles.filter(v=>!['已售出','已出售','已盤出'].includes(v.status)&&!completedSaleFor(v.id)&&!confirmedOutboundFor(v.id))
-        .sort((a,b)=>{const aDate=String(a.stockDate||''),bDate=String(b.stockDate||'');return !aDate?(!bDate?0:1):!bDate?-1:bDate.localeCompare(aDate)});
+        .sort((a,b)=>{const aDate=String(a.stockDate||''),bDate=String(b.stockDate||'');return !aDate?(!bDate?0:1):!bDate?-1:aDate.localeCompare(bDate)});
     }
     function renderYardSelector(){const available=yardAvailableVehicles(),ids=new Set(available.map(v=>v.id));yardSelectedIds=new Set([...yardSelectedIds].filter(id=>ids.has(id)));const list=document.getElementById('yardSelectorList');list.innerHTML=available.map(v=>`<label><input type="checkbox" class="yard-check" data-vehicle-id="${escapeHtml(v.id)}" ${yardSelectedIds.has(v.id)?'checked':''} onchange="toggleYardVehicle(this.dataset.vehicleId,this.checked)">${escapeHtml(v.plate||v.caseNo||'未命名')} ${escapeHtml(v.brand||'')} ${escapeHtml(v.model||'')}</label>`).join('')||'目前沒有場上車輛';document.getElementById('yardSelectedCount').textContent=`已選 ${yardSelectedIds.size}／${available.length} 台`;const all=document.getElementById('yardSelectAll');all.checked=!!available.length&&yardSelectedIds.size===available.length;all.indeterminate=yardSelectedIds.size>0&&yardSelectedIds.size<available.length}
     function toggleYardVehicle(id,checked){if(checked&&yardAvailableVehicles().some(v=>v.id===id))yardSelectedIds.add(id);else yardSelectedIds.delete(id);renderYardSelector();document.getElementById('yardOfficialReport').innerHTML=buildYardVehicleReport()}
