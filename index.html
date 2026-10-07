@@ -1224,9 +1224,9 @@ try{const j=JSON.parse(localStorage.getItem('weiyuCostCorrectionCommitted')||'nu
     function yardVehicleRow(v,index){
       const c=costBreakdown(v),preparation=c.preparationCost,tax=c.transferTaxInsurance,introduction=c.purchaseBonus;
       const setupKeys=['fuel','repair','bodyPaint','modification','detailing','otherCost','certificationFee','referralCommission','assistantBonus','contestBonus','educationFund'];
-      // 整備包含稅金及介紹費，另加新增的成本分類（例如 ETC）；稅金、介紹費欄是明細展示，不重複計入總成本。
-      const setup=setupKeys.reduce((sum,key)=>sum+c[key],0)+tax+introduction+Array.from(c.extras.values()).reduce((sum,n)=>sum+n,0);
-      const purchase=Number(v.purchase||0),total=purchase+preparation+setup;
+      // 整備不含稅金，仍包含介紹費及新增成本分類（例如 ETC）；稅金獨立計入總成本，介紹費欄僅為明細展示。
+      const setup=setupKeys.reduce((sum,key)=>sum+c[key],0)+introduction+Array.from(c.extras.values()).reduce((sum,n)=>sum+n,0);
+      const purchase=Number(v.purchase||0),total=purchase+preparation+setup+tax;
       const payment=[...(v.costEntries||[])].map(e=>e.payment).filter(Boolean).filter((x,i,a)=>a.indexOf(x)===i).join('、');
       return {values:[index+1,v.stockDate||'',v.brand||'',v.model||'',v.year||'',v.plate||'',v.color||'',v.displacement||'',purchase,preparation,setup,tax,introduction,total,v.note||'',v.status||'',payment||v.paymentMethod||'',v.source||'',v.dealer||''],purchase,preparation,setup,tax,introduction,total};
     }
@@ -1235,7 +1235,7 @@ try{const j=JSON.parse(localStorage.getItem('weiyuCostCorrectionCommitted')||'nu
     function buildYardVehicleReport(){
       const rows=yardReportRows();const totals=rows.reduce((a,r)=>{a.purchase+=r.purchase;a.preparation+=r.preparation;a.setup+=r.setup;a.tax+=r.tax;a.introduction+=r.introduction;a.total+=r.total;return a},{purchase:0,preparation:0,setup:0,tax:0,introduction:0,total:0});
       const body=rows.map(r=>`<tr>${r.values.map((value,i)=>`<td class="${i===8?'money purchase':i>=9&&i<=13?'money '+(i===13?'total':''):i===17?'source':''}">${i>=8&&i<=13?yardAmountText(value):escapeHtml(value||'')}</td>`).join('')}</tr>`).join('')||`<tr><td colspan="19">目前沒有車輛資料</td></tr>`;
-      return `<h1>威宇場上車輛</h1><table><thead><tr>${YARD_REPORT_HEADERS.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${body}</tbody><tfoot><tr><th colspan="8">合計（整備含稅金、介紹費；管銷不列入）</th><td class="money">${yardAmountText(totals.purchase)}</td><td class="money">${yardAmountText(totals.preparation)}</td><td class="money">${yardAmountText(totals.setup)}</td><td class="money">${yardAmountText(totals.tax)}</td><td class="money">${yardAmountText(totals.introduction)}</td><td class="money total">${yardAmountText(totals.total)}</td><td colspan="5"></td></tr></tfoot></table><div class="yard-report-note">報表日期：${new Date().toLocaleDateString('zh-TW')}｜共 ${rows.length} 台</div>`;
+      return `<h1>威宇場上車輛</h1><table><thead><tr>${YARD_REPORT_HEADERS.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${body}</tbody><tfoot><tr><th colspan="8">合計（整備含介紹費、不含稅金；稅金獨立列示；管銷不列入）</th><td class="money">${yardAmountText(totals.purchase)}</td><td class="money">${yardAmountText(totals.preparation)}</td><td class="money">${yardAmountText(totals.setup)}</td><td class="money">${yardAmountText(totals.tax)}</td><td class="money">${yardAmountText(totals.introduction)}</td><td class="money total">${yardAmountText(totals.total)}</td><td colspan="5"></td></tr></tfoot></table><div class="yard-report-note">報表日期：${new Date().toLocaleDateString('zh-TW')}｜共 ${rows.length} 台</div>`;
     }
     function previewYardVehicleReport(){yardSelectedIds=new Set(yardAvailableVehicles().map(v=>v.id));renderYardSelector();document.getElementById('yardOfficialReport').innerHTML=buildYardVehicleReport();document.getElementById('yardReportModal').classList.add('open')}
     function closeYardVehicleReport(){document.getElementById('yardReportModal').classList.remove('open')}
@@ -1249,7 +1249,7 @@ try{const j=JSON.parse(localStorage.getItem('weiyuCostCorrectionCommitted')||'nu
       sheet.mergeCells(1,1,1,19);sheet.getCell(1,1).value='威宇場上車輛';sheet.getRow(1).height=32;
       sheet.addRow(YARD_REPORT_HEADERS);rows.forEach(r=>sheet.addRow(r.values));
       const totals=rows.reduce((sum,r)=>{['purchase','preparation','setup','tax','introduction','total'].forEach(k=>sum[k]=(sum[k]||0)+r[k]);return sum},{});
-      const last=sheet.addRow(['合計（整備含稅金、介紹費；管銷不列入）','','','','','','','',totals.purchase,totals.preparation,totals.setup,totals.tax,totals.introduction,totals.total]);sheet.mergeCells(last.number,1,last.number,8);
+      const last=sheet.addRow(['合計（整備含介紹費、不含稅金；稅金獨立列示；管銷不列入）','','','','','','','',totals.purchase,totals.preparation,totals.setup,totals.tax,totals.introduction,totals.total]);sheet.mergeCells(last.number,1,last.number,8);
       sheet.addRow([`報表日期：${new Date().toLocaleDateString('zh-TW')}｜共 ${rows.length} 台`]);sheet.mergeCells(last.number+1,1,last.number+1,19);
       const border={top:{style:'thin',color:{argb:'FF9FA5AA'}},bottom:{style:'thin',color:{argb:'FF9FA5AA'}},left:{style:'thin',color:{argb:'FF9FA5AA'}},right:{style:'thin',color:{argb:'FF9FA5AA'}}};
       for(let r=1;r<=last.number;r++){
