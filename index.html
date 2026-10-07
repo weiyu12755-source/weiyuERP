@@ -1466,8 +1466,75 @@ try{const j=JSON.parse(localStorage.getItem('weiyuCostCorrectionCommitted')||'nu
         win.focus();win.print();
       }catch(e){if(!win.closed)win.close();console.error(e);alert('薪資單列印準備失敗，請稍後重試。')}
     }
-    function makePayslipSheet(r){const empIndex=employees.findIndex(e=>e.id===r.employeeId);const rowCount=11;const items=(r.commissionItems||[]).slice(0,rowCount);while(items.length<rowCount)items.push({});const rows=[['威宇汽車'],[`${rocMonthText(r.month)} 佣金明細表`],['編號：'+(empIndex>=0?empIndex+1:'－'),'','','','','姓名：'+r.employeeName,'','','職務：'+(r.title||'－'),'','','發薪日：'+payslipPayDate(r.month)],['銷售佣金試算 - '+Number(r.salesCommissionRate||30)+' %','','','','','','','','','','','扣款項目金額','','各項補助獎金',''],['日期','類別','年份','車款','顏色','車號','客戶','消訂金','貸款佣金','銷售佣金','採購獎金','項目','金額','項目','金額']];const deductions=padPayslipRows([...payslipFixedDeductions(r),...payslipAdjustmentRows(r,'扣項')],rowCount);const bonuses=padPayslipRows([...payslipFixedBonuses(r),...payslipAdjustmentRows(r,'加項')],rowCount);for(let i=0;i<rowCount;i++){const x=items[i]||{},d=deductions[i]||[],b=bonuses[i]||[];rows.push([x.date||'',x.category||'',x.year||'',x.model||'',x.color||'',x.plate||'',x.customer||'',Number(x.cancelDeposit||0)||'',Number(x.loanCommission||0)||'',Number(x.salesCommission||0)||'',Number(x.purchaseBonus||0)||'',d[0]||'',Number(d[1]||0)||'',b[0]||'',Number(b[1]||0)||''])}rows.push(['佣金小計:','',Number(r.commissionTotal||r.performanceBonus||0),'','','扣款小計:',Number(r.deductions||0),'','獎金小計:',Number(r.baseSalary||0)+Number(r.positionAllowance||0)+Number(r.otherAllowance||0)+Number(r.travelAllowance||0)+Number(r.referralBonus||0)+Number(r.adAllowance||0)+Number(r.attendanceBonus||0)+Number(r.extraBonus||0)+Number(r.tradeCancelBonus||0)+Number(r.customAdd||0),'','實發金額總計:','',Number(r.net||0),'']);rows.push(['備註:',r.note||'','','','','','','','','簽收人:','','','','','']);rows.push(['※ 貼心提醒：薪資款項請當面點清，爾後錯誤恕不負責！','','','','','','','','感謝您為公司的付出！','','','製表：'+new Date().toLocaleDateString('zh-TW'),'','','']);const ws=XLSX.utils.aoa_to_sheet(rows);ws['!merges']=[XLSX.utils.decode_range('A1:O1'),XLSX.utils.decode_range('A2:O2'),XLSX.utils.decode_range('A3:E3'),XLSX.utils.decode_range('F3:H3'),XLSX.utils.decode_range('I3:K3'),XLSX.utils.decode_range('L3:O3'),XLSX.utils.decode_range('A4:K4'),XLSX.utils.decode_range('L4:M4'),XLSX.utils.decode_range('N4:O4'),XLSX.utils.decode_range('A17:B17'),XLSX.utils.decode_range('C17:E17'),XLSX.utils.decode_range('F17:H17'),XLSX.utils.decode_range('I17:K17'),XLSX.utils.decode_range('L17:M17'),XLSX.utils.decode_range('N17:O17'),XLSX.utils.decode_range('A18:I18'),XLSX.utils.decode_range('J18:O18'),XLSX.utils.decode_range('A19:H19'),XLSX.utils.decode_range('I19:K19'),XLSX.utils.decode_range('L19:O19')];ws['!cols']=[{wch:12},{wch:10},{wch:8},{wch:16},{wch:10},{wch:13},{wch:14},{wch:11},{wch:12},{wch:12},{wch:11},{wch:16},{wch:12},{wch:18},{wch:12}];return ws}
-    function downloadPayslipExcel(){const r=payrollRecords.find(x=>x.id===viewingPayrollId);if(!r)return;const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,makePayslipSheet(r),'薪資單');XLSX.writeFile(wb,`薪資單_${r.employeeName}_${r.month}.xlsx`)}
+    // Excel uses the PDF's column proportions. Extra boundaries allow the four
+    // equal metadata fields and the differently sized footer panels to align exactly.
+    function payslipExcelSheetName(r,used){
+      const base=((r.employeeName||'員工')+'_'+(r.month||'月份')).replace(/[\\/:?*\[\]\x00-\x1f]/g,'_').replace(/^'+|'+$/g,'')||'薪資單';
+      let name=base.slice(0,31),n=2;
+      while(used.has(name.toLowerCase())){const suffix='_'+n++;name=base.slice(0,31-suffix.length)+suffix}
+      used.add(name.toLowerCase());return name;
+    }
+    function makePayslipSheet(r,wb,name='薪資單'){
+      const widths=[75,36,36,75,36,60,65,95,95,95,95,61,95,61,95],total=widths.reduce((s,w)=>s+w,0);
+      const edges=[0];widths.forEach(w=>edges.push(edges[edges.length-1]+w));
+      const meta=[0,total/4,total/2,total*3/4,total],summary=[0,total*3/13,total*6/13,total*9/13,total],footer=[0,total*9/15,total*12/15,total];
+      const stops=[...new Set([...edges,...meta,...summary,...footer])].sort((a,b)=>a-b);
+      const col=x=>stops.indexOf(x)+1,last=stops.length-1;
+      const ws=wb.addWorksheet(name,{views:[{showGridLines:false}]});
+      ws.columns=stops.slice(1).map((x,i)=>{const px=x-stops[i];return {width:px<12?px/12:(px-5)/7}});
+      const black={style:'thin',color:{argb:'FF000000'}},font={name:'微軟正黑體',size:10,color:{argb:'FF111111'}};
+      // Set each merged rectangle's perimeter after merging, including blank cells.
+      function panel(row,left,right,value,options={}){
+        const c1=col(left),c2=col(right)-1;
+        if(c2>c1)ws.mergeCells(row,c1,row,c2);
+        const cell=ws.getCell(row,c1);cell.value=value;
+        cell.font={...font,...options.font};cell.alignment={horizontal:'center',vertical:'middle',wrapText:true,...options.alignment};
+        cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:options.fill||'FFFFFFFF'}};
+        if(options.numFmt)cell.numFmt=options.numFmt;
+        if(options.border!==false)for(let c=c1;c<=c2;c++)ws.getCell(row,c).style={...cell.style,border:{top:black,bottom:black,...(c===c1?{left:black}:{}),...(c===c2?{right:black}:{})}};
+        const size=cell.font.size||10,capacity=Math.max(1,(right-left-8)/size),text=typeof value==='number'?String(Math.round(value)):String(value??'');
+        const lines=text.split('\n').reduce((sum,line)=>sum+Math.max(1,Math.ceil([...line].reduce((n,ch)=>n+(ch.charCodeAt(0)>255?1:0.55),0)/capacity)),0);
+        ws.getRow(row).height=Math.max(ws.getRow(row).height||0,options.height||23,lines*size*1.25+9);
+        return cell;
+      }
+      const numFmt='#,##0;[Red]-#,##0;"－"',amount=v=>Math.round(Number(v||0));
+      panel(1,0,total,'威宇汽車',{border:false,font:{size:19,bold:true},height:30});
+      panel(2,0,total,`${rocMonthText(r.month)} 佣金明細表`,{border:false,font:{size:15},height:29});
+      const empIndex=employees.findIndex(e=>e.id===r.employeeId);
+      ['編號：'+(empIndex>=0?empIndex+1:'－'),'姓名：'+(r.employeeName||''),'職務：'+(r.title||'－'),'發薪日：'+payslipPayDate(r.month)].forEach((v,i)=>panel(3,meta[i],meta[i+1],v,{alignment:{horizontal:'left'},height:30}));
+      panel(4,0,edges[11],'銷售佣金試算 - '+Number(r.salesCommissionRate||30)+' %',{font:{bold:true,size:11},height:29});
+      panel(4,edges[11],edges[13],'扣款項目金額',{font:{bold:true,size:11}});
+      panel(4,edges[13],total,'各項補助獎金',{font:{bold:true,size:11}});
+      ['日期','類別','年份','車款','顏色','車號','客戶','消訂金','貸款佣金','銷售佣金','採購獎金','項目','金額','項目','金額'].forEach((v,i)=>panel(5,edges[i],edges[i+1],v,{font:{bold:true},height:25}));
+      const items=r.commissionItems||[],deductions=[...payslipFixedDeductions(r),...payslipAdjustmentRows(r,'扣項')],bonuses=[...payslipFixedBonuses(r),...payslipAdjustmentRows(r,'加項')];
+      const count=Math.max(11,items.length,deductions.length,bonuses.length);
+      for(let i=0;i<count;i++){
+        const x=items[i]||{},d=deductions[i]||[],b=bonuses[i]||[];
+        const vals=[x.date||'',x.category||'',x.year||'',x.model||'',x.color||'',x.plate||'',x.customer||'',...['cancelDeposit','loanCommission','salesCommission','purchaseBonus'].map(k=>amount(x[k])),d[0]||'',d[0]?amount(d[1]):'',b[0]||'',b[0]?amount(b[1]):''];
+        vals.forEach((v,j)=>panel(6+i,edges[j],edges[j+1],v,{numFmt:typeof v==='number'?numFmt:undefined,alignment:{horizontal:typeof v==='number'?'right':'center'},font:j===12?{bold:true,color:{argb:'FFD12D35'}}:j===14?{bold:true,color:{argb:'FF16804F'}}:{},height:23}));
+      }
+      const end=6+count,commissionSubtotal=items.reduce((s,x)=>s+['cancelDeposit','loanCommission','salesCommission','purchaseBonus'].reduce((t,k)=>t+amount(x[k]),0),0);
+      const bonusSubtotal=['baseSalary','positionAllowance','otherAllowance','travelAllowance','referralBonus','adAllowance','attendanceBonus','extraBonus','tradeCancelBonus','customAdd'].reduce((sum,k)=>sum+Number(r[k]||0),0);
+      // Prefix formats keep the subtotal labels and editable numeric amounts in
+      // the same four panels as the PDF, without discarding merged-cell values.
+      ['佣金小計：','扣款小計：','獎金小計：','實發金額總計：'].forEach((label,i)=>panel(end,summary[i],summary[i+1],[commissionSubtotal,Number(r.deductions||0),bonusSubtotal,Number(r.net||0)][i],{numFmt:`"${label}"#,##0;"${label}"-#,##0;"${label}"0`,font:{bold:true,size:i===3?12:10,color:{argb:i===1?'FFD12D35':'FF111111'}},fill:i===3?'FFFFF4F4':'FFFFFFFF',alignment:{horizontal:'left'},height:32}));
+      panel(end+1,footer[0],footer[1],'備註：'+(r.note||''),{alignment:{horizontal:'left'},height:36});
+      panel(end+1,footer[1],footer[2],'簽收人：',{alignment:{horizontal:'left'}});panel(end+1,footer[2],footer[3],'');
+      ['※ 貼心提醒：薪資款項請當面點清，爾後錯誤恕不負責！','感謝您為公司的付出！','製表：'+new Date().toLocaleDateString('zh-TW')].forEach((v,i)=>panel(end+2,footer[i],footer[i+1],v,{font:{size:9},alignment:{horizontal:'left'},height:29}));
+      ws.pageSetup={paperSize:9,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0,printArea:`A1:${ws.getColumn(last).letter}${end+2}`,margins:{left:0.23,right:0.23,top:0.23,bottom:0.23,header:0,footer:0}};
+      ws.printOptions={horizontalCentered:true,gridLines:false};
+      return ws;
+    }
+    async function exportPayslipExcel(list,filename){
+      if(!window.ExcelJS)return alert('Excel 格式元件未載入，請確認網路連線並重新整理。');
+      try{
+        const wb=new ExcelJS.Workbook(),used=new Set();
+        list.forEach(r=>makePayslipSheet(r,wb,payslipExcelSheetName(r,used)));
+        const bytes=await wb.xlsx.writeBuffer(),url=URL.createObjectURL(new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})),a=document.createElement('a');
+        a.href=url;a.download=filename.replace(/[\\/:?*"<>|\x00-\x1f]/g,'_');document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
+      }catch(e){console.error(e);alert('薪資單 Excel 匯出失敗，請稍後重試。')}
+    }
+    async function downloadPayslipExcel(){const r=payrollRecords.find(x=>x.id===viewingPayrollId);if(!r)return;await exportPayslipExcel([r],`薪資單_${r.employeeName}_${r.month}.xlsx`)}
     async function renderPayslipToCanvas(r){
       const host=document.createElement('div');host.className='batch-render-host';
       host.innerHTML=`<div class="excel-payslip">${buildPayslip(r)}</div>`;
@@ -1480,7 +1547,7 @@ try{const j=JSON.parse(localStorage.getItem('weiyuCostCorrectionCommitted')||'nu
       }finally{host.remove()}
     }
     async function downloadSelectedPayslipsPdf(){const list=selectedPayrollRecords();if(!list.length)return alert('請先勾選要批量下載的薪資資料。');const {jsPDF}=window.jspdf;const pdf=new jsPDF('l','mm','a4');for(let i=0;i<list.length;i++){if(i>0)pdf.addPage('a4','l');const canvas=await renderPayslipToCanvas(list[i]);const pageW=297,pageH=210,margin=6,maxW=pageW-margin*2,maxH=pageH-margin*2,ratio=Math.min(maxW/canvas.width,maxH/canvas.height),w=canvas.width*ratio,h=canvas.height*ratio;pdf.addImage(canvas.toDataURL('image/png'),'PNG',(pageW-w)/2,(pageH-h)/2,w,h,undefined,'FAST')}pdf.save(`批量薪資表_${new Date().toISOString().slice(0,10)}.pdf`)}
-    function downloadSelectedPayslipsExcel(){const list=selectedPayrollRecords();if(!list.length)return alert('請先勾選要批量下載的薪資資料。');const wb=XLSX.utils.book_new(),used=new Set();list.forEach((r,i)=>{let base=(r.employeeName||'員工')+'_'+(r.month||'月份'),name=base.slice(0,31),n=2;while(used.has(name))name=(base.slice(0,27)+'_'+n++).slice(0,31);used.add(name);XLSX.utils.book_append_sheet(wb,makePayslipSheet(r),name)});XLSX.writeFile(wb,`批量薪資表_${new Date().toISOString().slice(0,10)}.xlsx`)}
+    async function downloadSelectedPayslipsExcel(){const list=selectedPayrollRecords();if(!list.length)return alert('請先勾選要批量下載的薪資資料。');await exportPayslipExcel(list,`批量薪資表_${new Date().toISOString().slice(0,10)}.xlsx`)}
     const PAYROLL_SUMMARY_HEADERS=['編號','姓名','職稱','實發薪資','總薪資','業績獎金','車換車及消訂獎金','車資補助','介紹獎金','廣告補助','職務加給','勞健保','加發獎金','全勤','遲到扣薪','未打卡扣薪','請假扣薪','預支扣款','上月未扣','公積金','還款','備註'];
     const PAYROLL_SUMMARY_WIDTHS=[5,9,8,13,13,13,19,13,11,12,12,12,10,11,12,12,10,12,12,11,9,15];
     function payrollSummaryGroups(){const list=filteredPayrollList(),groups=new Map();list.forEach(r=>{const key=r.month||'未設定月份';if(!groups.has(key))groups.set(key,[]);groups.get(key).push(r)});return [...groups].sort((a,b)=>b[0].localeCompare(a[0]))}
