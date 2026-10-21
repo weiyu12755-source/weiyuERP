@@ -1358,14 +1358,51 @@ try{const j=JSON.parse(localStorage.getItem('weiyuCostCorrectionCommitted')||'nu
     function yardPrintCss(){return `@page{size:A4 landscape;margin:8mm}*{box-sizing:border-box}body{font-family:'Noto Sans TC',sans-serif;margin:0;color:#16181b}.yard-report{width:281mm;margin:0 auto;padding:5mm;background:#fff}.yard-report h1{text-align:center;font-size:20px;letter-spacing:.12em;margin:0 0 5mm}.yard-report table{width:100%;table-layout:auto;border-collapse:collapse;font-size:8px}.yard-report th,.yard-report td{border:1px solid #8f969c;padding:4px 2px;text-align:center;word-break:break-word}.yard-report th{background:#f0f1f2;white-space:nowrap}.yard-report td:nth-child(3),.yard-report td:nth-child(4),.yard-report td:nth-child(6){white-space:nowrap}.yard-report td:nth-child(15){min-width:26mm;white-space:pre-wrap;overflow-wrap:anywhere;text-align:left}.yard-report td.money{text-align:right;white-space:nowrap}.yard-report .purchase{color:#cf2e38}.yard-report .total{background:#cdf2d7;color:#2157a1;font-weight:800}.yard-report .source{color:#d43b43}.yard-report td:nth-child(19){overflow-wrap:anywhere}.yard-report tr{break-inside:avoid;page-break-inside:avoid}.yard-report thead{display:table-header-group}.yard-report tfoot{display:table-footer-group}.yard-report-note{text-align:right;font-size:8px;margin-top:3mm}`}
     function printYardVehicleReport(){if(!yardReportRows().length)return alert('請先勾選場上車輛。');const html=buildYardVehicleReport(),win=window.open('','_blank','width=1200,height=850');if(!win)return alert('瀏覽器阻擋了列印視窗，請允許彈出式視窗後再試。');win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>威宇場上車輛報表</title><style>${yardPrintCss()}</style></head><body><div class="yard-report">${html}</div></body></html>`);win.document.close();win.onload=()=>{win.focus();win.print()}}
     async function downloadYardVehicleExcel(){
-      const rows=yardReportRows();if(!rows.length)return alert('請先勾選要匯出的車輛。');
+      const selected=yardAvailableVehicles().filter(v=>yardSelectedIds.has(v.id)),rows=selected.map(yardVehicleRow);if(!rows.length)return alert('請先勾選要匯出的車輛。');
       if(!window.ExcelJS)return alert('Excel 格式元件未載入，請確認網路連線並重新整理。');
       const workbook=new ExcelJS.Workbook(),sheet=workbook.addWorksheet('場上車輛',{views:[{state:'frozen',ySplit:2}]});
+      // Excel 專用：只讀取所選車輛，不修改車籍、成本或資料庫。
+      const ids=selected.map(v=>String(v.id??''));
+      if(ids.some(id=>!id)||new Set(ids.map(id=>id.toLowerCase())).size!==ids.length)return alert('車輛唯一 ID 空白或重複，無法安全對應成本明細。');
+      workbook.calcProperties={calcMode:'auto',fullCalcOnLoad:true,forceFullCalc:true};
+      const detail=workbook.addWorksheet('成本明細',{views:[{state:'frozen',ySplit:4}]});
+      detail.columns=[38,15,14,25,19,22,18,21,36].map(width=>({width}));
+      detail.mergeCells('A1:I1');detail.getCell('A1').value='場上車輛成本明細（獨立試算，不回寫系統）';
+      detail.mergeCells('A2:I2');detail.getCell('A2').value='藍底 E 欄金額可修改；G、H 欄為公式。A–D、F、I 欄為來源資料，請勿修改。主報表 I 欄進價可修改，J–N 欄為公式。';
+      detail.mergeCells('A3:I3');detail.getCell('A3').value='分類已依系統去除前後空白並統一斜線。舊欄位僅補做成本；有做成本明細（即使為 0）即停用補值。請在既有列修改金額，勿覆蓋公式。';
+      detail.getRow(4).values=['車輛唯一 ID（勿改）','車牌（參考）','日期','成本分類（勿改）','金額（可修改）','資料來源（勿改）','報表分類（公式）','採計金額（公式）','備註／內容'];
+      const detailItems=[];
+      selected.forEach((v,i)=>{
+        const entries=Array.isArray(v.costEntries)?v.costEntries:[];
+        entries.forEach(e=>detailItems.push({id:ids[i],plate:v.plate||'',date:e.date||'',category:String(e.category||'').trim().replace(/／/g,'/'),amount:Number(e.amount||0),source:'成本明細',note:[e.vendor,e.payment,e.note].filter(Boolean).join('；')}));
+        detailItems.push({id:ids[i],plate:v.plate||'',date:'',category:'做成本',amount:Number(v.preparationCost||0),source:'舊欄位補值',note:'僅無做成本明細時採計',disabled:entries.some(e=>String(e.category||'').trim()==='做成本')});
+      });
+      const detailEnd=4+detailItems.length;
+      // SUMIFS 的車輛鍵採文字完全比對，並跳脫萬用字元。
+      const exactId=ref=>`"="&SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(${ref},"~","~~"),"*","~*"),"?","~?")`;
+      detailItems.forEach((item,i)=>{
+        const r=i+5,group=item.category==='做成本'?'做成本':item.category==='過戶/稅金/保險'?'過戶/稅金/保險':item.category==='採購獎金'?'介紹費':'整備';
+        detail.addRow([item.id,item.plate,item.date,item.category,item.amount,item.source,
+          {formula:`IF(D${r}="做成本","做成本",IF(D${r}="過戶/稅金/保險","過戶/稅金/保險",IF(D${r}="採購獎金","介紹費","整備")))`,result:group},
+          {formula:`IF(F${r}="舊欄位補值",IF(COUNTIFS($A$5:$A$${detailEnd},${exactId(`A${r}`)},$F$5:$F$${detailEnd},"成本明細",$G$5:$G$${detailEnd},"做成本")=0,E${r},0),E${r})`,result:item.disabled?0:item.amount},item.note]);
+      });
+      detail.autoFilter={from:'A4',to:`I${detailEnd}`};
       const widths=[6,13,13,19,9,13,10,11,15,14,15,23,14,16,30,11,12,15,19];sheet.columns=widths.map(width=>({width}));
       sheet.mergeCells(1,1,1,19);sheet.getCell(1,1).value='威宇場上車輛';sheet.getRow(1).height=32;
       sheet.addRow(YARD_REPORT_HEADERS);rows.forEach(r=>sheet.addRow(r.values));
+      sheet.getColumn(20).hidden=true;sheet.getCell('T2').value='車輛唯一 ID（公式對應，勿改）';
+      rows.forEach((r,i)=>{
+        const n=i+3;sheet.getCell(n,20).value=ids[i];
+        ['做成本','整備','過戶/稅金/保險','介紹費'].forEach((category,j)=>{
+          sheet.getCell(n,j+10).value={formula:`SUMIFS('成本明細'!$H$5:$H$${detailEnd},'成本明細'!$A$5:$A$${detailEnd},${exactId(`$T${n}`)},'成本明細'!$G$5:$G$${detailEnd},"${category}")`,result:r.values[j+9]};
+        });
+        sheet.getCell(n,14).value={formula:`SUM(I${n}:M${n})`,result:r.total};
+      });
       const totals=rows.reduce((sum,r)=>{['purchase','preparation','setup','tax','introduction','total'].forEach(k=>sum[k]=(sum[k]||0)+r[k]);return sum},{});
       const last=sheet.addRow(['合計（三類分列；做成本獨立計入）','','','','','','','',totals.purchase,totals.preparation,totals.setup,totals.tax,totals.introduction,totals.total]);sheet.mergeCells(last.number,1,last.number,8);
+      ['purchase','preparation','setup','tax','introduction','total'].forEach((key,i)=>{
+        const col=sheet.getColumn(i+9).letter;sheet.getCell(last.number,i+9).value={formula:`SUM(${col}3:${col}${last.number-1})`,result:totals[key]};
+      });
       sheet.addRow([`報表日期：${new Date().toLocaleDateString('zh-TW')}｜共 ${rows.length} 台`]);sheet.mergeCells(last.number+1,1,last.number+1,19);
       const border={top:{style:'thin',color:{argb:'FF9FA5AA'}},bottom:{style:'thin',color:{argb:'FF9FA5AA'}},left:{style:'thin',color:{argb:'FF9FA5AA'}},right:{style:'thin',color:{argb:'FF9FA5AA'}}};
       for(let r=1;r<=last.number;r++){
@@ -1381,6 +1418,18 @@ try{const j=JSON.parse(localStorage.getItem('weiyuCostCorrectionCommitted')||'nu
       }
       sheet.getCell(last.number+1,1).alignment={horizontal:'right'};
       sheet.pageSetup={paperSize:9,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0,printTitlesRow:'1:2',margins:{left:0.25,right:0.25,top:0.3,bottom:0.3,header:0.1,footer:0.1}};
+      for(let r=1;r<=detailEnd;r++){
+        const row=detail.getRow(r);row.height=r===1?32:r<=3?36:r===4?32:30;
+        for(let c=1;c<=9;c++){
+          const cell=row.getCell(c);cell.border=border;
+          cell.font={name:'Microsoft JhengHei',size:r===1?15:10,bold:r===1||r===4,color:{argb:r>4&&c===5?'FF1F4E78':'FF333333'}};
+          cell.alignment={vertical:'middle',horizontal:r>4&&[5,8].includes(c)?'right':'left',wrapText:true};
+          if(r===4)cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF0F1F2'}};
+          if(r>4&&c===5)cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFEAF3FF'}};
+          if(r>4&&[7,8].includes(c))cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF0F1F2'}};
+          if(r>4&&[5,8].includes(c))cell.numFmt='#,##0';
+        }
+      }
       const bytes=await workbook.xlsx.writeBuffer(),blob=new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=`威宇場上車輛_${new Date().toISOString().slice(0,10)}.xlsx`;link.click();setTimeout(()=>URL.revokeObjectURL(url),60000);
     }
     async function downloadYardVehiclePdf(){if(!yardReportRows().length)return alert('請先勾選場上車輛。');const report=document.getElementById('yardOfficialReport');report.innerHTML=buildYardVehicleReport();if(document.fonts)await document.fonts.ready;const canvas=await html2canvas(report,{scale:2,useCORS:true,backgroundColor:'#fff',logging:false,windowWidth:1123});const {jsPDF}=window.jspdf,pdf=new jsPDF('l','mm','a4'),margin=6,printW=285,printH=198,pxPerMm=canvas.width/printW,pagePx=Math.floor(printH*pxPerMm);let y=0,page=0;while(y<canvas.height){const target=Math.min(y+pagePx,canvas.height);let end=target;const reportRect=report.getBoundingClientRect(),scale=canvas.width/reportRect.width;const breaks=[...report.querySelectorAll('tr')].map(tr=>Math.round((tr.getBoundingClientRect().bottom-reportRect.top)*scale)).filter(v=>v>y+pagePx*.55&&v<=target-4);if(breaks.length)end=breaks[breaks.length-1];if(end<=y)end=target;const c=document.createElement('canvas');c.width=canvas.width;c.height=end-y;const ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);ctx.drawImage(canvas,0,y,canvas.width,end-y,0,0,canvas.width,end-y);if(page++)pdf.addPage('a4','l');pdf.addImage(c.toDataURL('image/png'),'PNG',margin,margin,printW,(end-y)/pxPerMm,undefined,'FAST');y=end}pdf.save(`威宇場上車輛_${new Date().toISOString().slice(0,10)}.pdf`)}
