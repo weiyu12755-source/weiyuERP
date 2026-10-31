@@ -398,7 +398,7 @@
           <div id="salesKpis" class="sales-kpis"></div>
           <div class="card full-card">
             <div class="section-head"><div><h3>銷售與收款</h3><p>依庫存車建立銷售單，連動車輛成本、員工業務與薪資佣金</p></div><div class="action-group"><button class="btn btn-light" onclick="openReferrerRateManager()">管理直屬分潤比例</button><button class="btn btn-primary" onclick="openSalesModal()">＋ 新增銷售單</button></div></div>
-            <div class="toolbar"><input id="salesSearch" placeholder="搜尋車牌、車款、客戶、業務" oninput="renderSales()"><select id="salesStatusFilter" onchange="renderSales()"><option value="">全部狀態</option><option>未收訂</option><option>已收訂</option><option>辦貸款</option><option>待交車</option><option>已完成</option><option>取消</option></select><input id="salesMonthFilter" type="month" onchange="renderSales()"><button class="btn btn-light" onclick="previewSalesReport()">預覽勾選報表</button><button class="btn btn-light" onclick="printSelectedSalesReports()">批量列印</button><button class="btn btn-light" onclick="downloadSelectedSalesReportsPdf()">批量下載 PDF</button><button class="btn btn-light" onclick="downloadSalesExcel()">下載 Excel</button><span class="selected-count" id="salesSelectedCount">已勾選 0 筆</span></div>
+            <div class="toolbar"><input id="salesSearch" placeholder="搜尋車牌、車款、客戶、業務" oninput="renderSales()"><select id="salesStatusFilter" onchange="renderSales()"><option value="">全部狀態</option><option>未收訂</option><option>已收訂</option><option>辦貸款</option><option>待交車</option><option>已完成</option><option>取消</option></select><input id="salesMonthFilter" type="month" onchange="renderSales()" aria-describedby="salesMonthHelp"><small id="salesMonthHelp">月份：優先依交車日，無交車日則依收訂日</small><button class="btn btn-light" onclick="previewSalesReport()">預覽勾選報表</button><button class="btn btn-light" onclick="printSelectedSalesReports()">批量列印</button><button class="btn btn-light" onclick="downloadSelectedSalesReportsPdf()">批量下載 PDF</button><button class="btn btn-light" onclick="downloadSalesExcel()">下載 Excel</button><button class="btn btn-light" id="salesCostExcelButton" onclick="downloadSalesWithCostsExcel()">下載 Excel（含成本明細）</button><button class="btn btn-light" id="salesCostPdfButton" onclick="downloadSalesWithCostsPdf()">下載 PDF（含成本明細）</button><span class="selected-count" id="salesSelectedCount">已勾選 0 筆</span></div>
             <div class="table-wrap"><table class="sales-table"><thead><tr><th><input class="vehicle-check" type="checkbox" id="selectAllSales" onchange="toggleSelectAllSales(this.checked)"></th><th>收訂日</th><th>撥款日</th><th>交車日</th><th>年份</th><th>廠牌</th><th>車款</th><th>車牌</th><th>新車牌</th><th>顏色</th><th>銷售總價</th><th>總成本</th><th>實收金額</th><th>整台總利潤</th><th>公司持有%</th><th>公司分攤利潤</th><th>同行應結算</th><th>稅金</th><th>實利潤</th><th>業務</th><th>抽成</th><th>業務獎金</th><th>公司總毛利</th><th>直屬主管</th><th>直屬分潤</th><th>狀態</th><th>操作</th></tr></thead><tbody id="salesRows"></tbody></table></div>
           </div>
 <div class="card full-card" id="carProfitPanel">
@@ -2038,7 +2038,7 @@ try{const j=JSON.parse(localStorage.getItem('weiyuCostCorrectionCommitted')||'nu
     function closeSalesReportModal(){document.getElementById('salesReportModal').classList.remove('open')}
     function toggleSalesSelection(id,checked){checked?selectedSalesIds.add(id):selectedSalesIds.delete(id);updateSalesSelectedCount()}
     function toggleSelectAllSales(checked){filteredSalesList().forEach(r=>checked?selectedSalesIds.add(r.id):selectedSalesIds.delete(r.id));renderSales()}
-    function updateSalesSelectedCount(){const el=document.getElementById('salesSelectedCount');if(el)el.textContent=`已勾選 ${selectedSalesIds.size} 筆`;const all=document.getElementById('selectAllSales');if(all){const list=filteredSalesList();all.checked=!!list.length&&list.every(r=>selectedSalesIds.has(r.id));all.indeterminate=list.some(r=>selectedSalesIds.has(r.id))&&!all.checked}}
+    function updateSalesSelectedCount(){const el=document.getElementById('salesSelectedCount');if(el)el.textContent=`目前篩選已勾選 ${filteredSalesList().filter(r=>selectedSalesIds.has(r.id)).length} 筆`;const all=document.getElementById('selectAllSales');if(all){const list=filteredSalesList();all.checked=!!list.length&&list.every(r=>selectedSalesIds.has(r.id));all.indeterminate=list.some(r=>selectedSalesIds.has(r.id))&&!all.checked}}
     function selectedSalesList(){return salesRecords.map(normalizeSale).filter(r=>selectedSalesIds.has(r.id))}
     function previewSingleSaleReport(id){const raw=salesRecords.find(x=>x.id===id);if(!raw)return alert('找不到這筆銷售資料。');document.getElementById('salesReportContent').innerHTML=buildSalesReport([normalizeSale(raw)]);document.getElementById('salesReportModal').classList.add('open')}
     function salesPrintCss(){return `@page{size:A4 portrait;margin:10mm}*{box-sizing:border-box}body{font-family:'Noto Sans TC',sans-serif;margin:0;background:#fff;color:#16181b}.sales-official-page{width:190mm!important;max-width:190mm!important;margin:0 auto!important;padding:8mm!important;box-shadow:none!important;font-size:11px!important;page-break-after:always;break-after:page}.sales-official-page:last-child{page-break-after:auto;break-after:auto}.report-header{text-align:center;border-bottom:3px solid #8f1117;padding-bottom:12px;margin-bottom:14px}.report-header h1{font-size:23px;margin:0 0 4px;letter-spacing:.14em}.report-header p{margin:0;color:#666}.report-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px}.report-meta div{border:1px solid #d8dce1;padding:7px}.report-meta small{display:block;color:#777;margin-bottom:2px}.report-section{margin-top:11px;break-inside:avoid!important;page-break-inside:avoid!important}.report-section h3{break-after:avoid!important;page-break-after:avoid!important}.report-section h3{margin:0;padding:6px 9px;background:#272b30;color:#fff;font-size:13px}.report-table{width:100%;border-collapse:collapse}.report-table th,.report-table td{border:1px solid #d8dce1;padding:5px 7px;vertical-align:middle}.report-table th{width:22%;background:#f5f6f7;color:#444}.report-table td{width:28%;word-break:break-word}.report-total th,.report-total td{font-weight:800;color:#b52228;background:#fff3f3}.report-footer{margin-top:14px;display:flex;justify-content:space-between;color:#666;font-size:10px}`}
@@ -2974,6 +2974,133 @@ opWrapLegacySave('saveMiscExpense','misc',()=>editingMiscExpenseId);
  });
  syncNavigation();viewportSize();
 })();
+</script>
+
+
+<style>
+#salesMonthHelp{white-space:normal;line-height:1.5;color:#667085;max-width:100%}
+#salesCostExcelButton,#salesCostPdfButton{white-space:normal;max-width:100%}
+.integrated-export-host{position:absolute;left:-20000px;top:0;width:794px;background:white;color:#16181b}
+.integrated-export-page{box-sizing:border-box;width:794px!important;max-width:none!important;padding:38px 42px!important;margin:0!important;background:#fff;font-size:13px;box-shadow:none!important}
+.integrated-export-page table{table-layout:fixed;width:100%;border-collapse:collapse}
+.integrated-export-page td,.integrated-export-page th{overflow-wrap:anywhere;word-break:normal}
+.integrated-cost-page .report-table td,.integrated-cost-page .report-table th{width:auto;font-size:11px;padding:5px}
+.integrated-export-page .integrated-cost-table th,.integrated-export-page .integrated-cost-table td{width:auto;padding:6px;font-size:12px}
+.integrated-export-page .integrated-cost-table th:nth-child(1){width:15%}
+.integrated-export-page .integrated-cost-table th:nth-child(6){width:17%}
+.integrated-export-page .integrated-cost-table .money{white-space:normal}
+</style>
+<script>
+// Read-only integration: use effective vehicle costs and existing normalized sale snapshots.
+function integratedSelectedSales(){return filteredSalesList().filter(r=>selectedSalesIds.has(r.id))}
+function integratedExportData(){
+ const list=integratedSelectedSales();
+ if(!list.length){alert('請先勾選目前篩選範圍內要匯出的銷售資料。');return null}
+ const errors=[],pairs=[];
+ for(const sale of list){
+  const matches=vehicles.filter(v=>v.id===sale.vehicleId),v=matches[0];
+  let reason='';
+  if(!sale.vehicleId)reason='銷售單缺少 vehicleId';
+  else if(!v)reason='找不到關聯車輛 ID：'+sale.vehicleId;
+  else if(matches.length!==1)reason='關聯車輛 ID 重複';
+  else if(!Array.isArray(v.costEntries))reason='成本明細資料缺失（非空白明細清單）';
+  else if([v.purchase,v.total,...v.costEntries.map(e=>e?.amount)].some(n=>n===null||n===undefined||String(n).trim()===''||!Number.isFinite(Number(n))))reason='採購價、總成本或逐筆成本金額缺失／無效';
+  if(reason)errors.push(`${v?.caseNo||sale.caseNo||sale.id}｜${v?.plate||sale.vehicle?.plate||'未知車牌'}：${reason}`);
+  else pairs.push({sale,vehicle:v});
+ }
+ if(errors.length){alert('整合匯出已停止，請先核對以下案件：\n'+errors.join('\n'));return null}
+ // Capture once: switching filters or later updates cannot change an in-progress export.
+ return JSON.parse(JSON.stringify(pairs));
+}
+function integratedSheetName(raw,used){
+ let base=String(raw).replace(/[\\/?:*\[\]\x00-\x1f]/g,'_').replace(/^'+|'+$/g,'').trim()||'成本明細';
+ let name=base.slice(0,31),n=2;
+ while(used.has(name.toLowerCase())){const suffix='_'+n++;name=base.slice(0,31-suffix.length)+suffix}
+ used.add(name.toLowerCase());return name;
+}
+function integratedExportFilename(ext){return `銷售與收款_含成本明細_${document.getElementById('salesMonthFilter').value||'全部月份'}_${new Date().toISOString().slice(0,10)}.${ext}`}
+async function integratedExportBusy(buttonId,run){
+ const button=document.getElementById(buttonId);if(button.disabled)return;
+ const label=button.textContent;button.disabled=true;button.textContent='產生中…';
+ try{await run()}catch(error){console.error(error);alert('整合匯出失敗：'+error.message)}finally{button.disabled=false;button.textContent=label}
+}
+async function downloadSalesWithCostsExcel(){
+ const pairs=integratedExportData();if(!pairs)return;
+ return integratedExportBusy('salesCostExcelButton',async()=>{
+  if(!window.XLSX||!window.ExcelJS)throw new Error('Excel 元件尚未載入，請確認網路連線後重試。');
+  const wb=makeIntegratedSalesBook(pairs.map(p=>p.sale)),used=new Set(wb.SheetNames.map(n=>n.toLowerCase()));
+  for(const {vehicle} of pairs)XLSX.utils.book_append_sheet(wb,makeCostSheet(vehicle),integratedSheetName('成本明細_'+(vehicle.plate||vehicle.caseNo||vehicle.id),used));
+  await writeStyledVehicleExcel(wb,integratedExportFilename('xlsx'));
+ });
+}
+// Paginate actual DOM rows before rasterization, retaining normal font sizes and repeated table headings.
+async function integratedAppendReport(pdf,host,html,kind,ref){
+ const source=document.createElement('div');source.innerHTML=html;
+ const report=kind==='sale'?source.querySelector('.sales-official-page'):source;
+ if(!report)throw new Error('銷售報表內容缺失');
+ if(kind==='cost')report.querySelectorAll('table').forEach(t=>{if(t.querySelector('thead'))t.classList.add('integrated-cost-table')});
+ const maxHeight=281*794/194,pages=[];
+ let page;
+ const newPage=()=>{page=document.createElement('div');page.className='official-report integrated-export-page'+(kind==='cost'?' integrated-cost-page':'');host.appendChild(page);pages.push(page)};
+ const overflow=()=>page.getBoundingClientRect().height>maxHeight;
+ newPage();
+ for(const block of [...report.children]){
+  const copy=block.cloneNode(true);page.appendChild(copy);
+  if(!overflow())continue;
+  copy.remove();
+  const table=block.querySelector('table');
+  if(!table){if(page.children.length)newPage();page.appendChild(copy);continue}
+  const bodyRows=[...table.querySelectorAll('tr')].filter(row=>!row.closest('thead'));
+  const section=()=>{
+   const box=block.cloneNode(false);
+   for(const child of block.children){if(child.tagName!=='TABLE')box.appendChild(child.cloneNode(true))}
+   const t=table.cloneNode(false);if(kind==='cost'&&table.querySelector('thead'))t.classList.add('integrated-cost-table');
+   const head=table.querySelector('thead');if(head)t.appendChild(head.cloneNode(true));
+   const body=document.createElement('tbody');t.appendChild(body);box.appendChild(t);page.appendChild(box);return {box,body};
+  };
+  let part=section();
+  for(const row of bodyRows){
+   const clone=row.cloneNode(true);part.body.appendChild(clone);
+   if(overflow()){
+    clone.remove();if(!part.body.children.length)part.box.remove();
+    if(page.children.length)newPage();
+    if(!page.contains(part.box))part=section();else if(part.body.children.length){newPage();part=section()}
+    part.body.appendChild(clone);
+   }
+  }
+ }
+ for(const el of pages){
+  if(!el.children.length)continue;
+  const rect=el.getBoundingClientRect();
+  const canvas=await html2canvas(el,{scale:2,useCORS:true,backgroundColor:'#fff',windowWidth:794,windowHeight:Math.ceil(rect.height),logging:false});
+  const pxPerMm=canvas.width/194,pagePx=Math.floor(281*pxPerMm);
+  // An exceptionally tall single row continues at full width without shrinking or omission.
+  for(let y=0;y<canvas.height;y+=pagePx){
+   const h=Math.min(pagePx,canvas.height-y),slice=document.createElement('canvas');slice.width=canvas.width;slice.height=h;
+   const ctx=slice.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,slice.width,h);ctx.drawImage(canvas,0,y,canvas.width,h,0,0,canvas.width,h);
+   if(!ref.first)pdf.addPage('a4','p');ref.first=false;
+   pdf.addImage(slice.toDataURL('image/png'),'PNG',8,8,194,h/pxPerMm,undefined,'FAST');
+  }
+  el.remove();
+ }
+}
+async function downloadSalesWithCostsPdf(){
+ const pairs=integratedExportData();if(!pairs)return;
+ return integratedExportBusy('salesCostPdfButton',async()=>{
+  if(!window.jspdf?.jsPDF||!window.html2canvas)throw new Error('PDF 元件尚未載入，請確認網路連線後重試。');
+  const host=document.createElement('div');host.className='integrated-export-host';document.body.appendChild(host);
+  try{
+   if(document.fonts)await document.fonts.ready;
+   const pdf=new window.jspdf.jsPDF({orientation:'p',unit:'mm',format:'a4',compress:true}),ref={first:true};
+   for(const {sale,vehicle} of pairs){
+    await integratedAppendReport(pdf,host,buildSalesReport([sale]),'sale',ref);
+    await integratedAppendReport(pdf,host,buildCostOfficialReport(vehicle),'cost',ref);
+   }
+   pdf.save(integratedExportFilename('pdf'));
+  }finally{host.remove()}
+ });
+}
+    function makeIntegratedSalesBook(list){const headers=['結算核對','累計實收','實收內前車收購價','外部收款（合併統計用）','收訂日','撥款日','交車日','年份','廠牌','車款','車牌','新車牌','顏色','客戶','訂金','補定合計','補定明細','銀撥','尾款','超貸找錢','前車結清','前車收購','前車收購備註','銷售總價','總成本','整台總利潤','持有方式','同行車行','公司出資本金','同行出資本金','公司持有%','公司分攤利潤','同行應結算','稅金','實利潤','業務','本台抽成%','業務獎金','公司總毛利','直屬主管','直屬分潤%','直屬分潤','狀態','備註',...JOINT_FIELDS.map(x=>x[0])];const rows=list.map(r=>[r.settlementReview||'',r.receivedAmount,r.previousCarReceiptAmount??'待核對',r.externalReceivedAmount??'待核對',r.orderDate,r.fundingDate,r.deliveryDate,r.vehicle?.year,r.vehicle?.brand,r.vehicle?.model,r.vehicle?.plate,r.newPlate,r.vehicle?.color,r.customerName,r.deposit,r.extraDepositTotal,(r.extraDeposits||[]).map((x,i)=>`補定${i+1}:${Number(x.amount||0)}${x.note?'('+x.note+')':''}`).join('；'),r.loanAmount,r.tailPayment,r.overloanRefund,r.previousCarSettlement,r.previousCarPurchase,r.previousCarNote,r.salePrice,r.totalCost,r.profit,r.ownershipType,r.jointPartnerName,r.companyInvestment,r.partnerInvestment,r.companyOwnershipRate*100,r.companyShareProfit,r.partnerSettlement,r.taxAmount,r.realProfit,r.employee?.name,r.commissionRate,r.commission,r.companyGross,r.manager?.name||'',r.managerCommissionRate,r.managerCommission,r.status,r.note,...jointValues(r)]);const ws=XLSX.utils.aoa_to_sheet([headers,...rows]);ws['!cols']=headers.map(h=>({wch:Math.max(12,h.length+4)}));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'銷售與收款');return wb}
 </script>
 
 </body>
