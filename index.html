@@ -3301,5 +3301,78 @@ async function opSaveInlineNature(kind,id,nature,button){
 }
 
 </script>
+<script>
+// Scoped portrait XLSX exports. Existing ledgers, snapshots, shared exporters and PDFs are untouched.
+(function(){
+ const C={ink:'FF293D50',light:'FFEAF0F5',gold:'FFF3EBDD',line:'FFBDC8D2',white:'FFFFFFFF'};
+ const fmt='#,##0;[Red]-#,##0;0';
+ const width=s=>Array.from(String(s??'')).reduce((n,c)=>n+(c.charCodeAt(0)>255?2:1),0);
+ function book(){if(!window.ExcelJS)throw new Error('Excel 元件尚未載入，請確認網路連線後重試。');const b=new ExcelJS.Workbook();b.creator='威宇車業';return b}
+ function sheet(b,name,title,sub){
+  const w=b.addWorksheet(name,{views:[{state:'frozen',ySplit:2,showGridLines:false}]});
+  w.columns=[13,17,17,13,20,16].map(width=>({width}));
+  band(w,title,'title');band(w,sub,'sub');
+  w.pageSetup={paperSize:9,orientation:'portrait',fitToPage:true,fitToWidth:1,fitToHeight:0,printTitlesRow:'1:2',margins:{left:.3,right:.3,top:.4,bottom:.4,header:.15,footer:.15}};
+  w.headerFooter={oddFooter:'&L威宇車業&R第 &P 頁／共 &N 頁'};return w;
+ }
+ function style(cell,value,kind){
+  cell.value=value??'';cell.font={name:'Microsoft JhengHei',size:11,bold:['section','total','label','head'].includes(kind),color:{argb:['section','head'].includes(kind)?C.white:C.ink}};
+  cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:['section','head'].includes(kind)?C.ink:kind==='total'?C.gold:kind==='label'?C.light:C.white}};
+  cell.border=Object.fromEntries(['top','bottom','left','right'].map(k=>[k,{style:kind==='total'?'medium':'thin',color:{argb:C.line}}]));
+  cell.alignment={vertical:'middle',horizontal:typeof value==='number'||value?.formula?'right':'left',wrapText:true};
+  if(typeof value==='number'||value?.formula)cell.numFmt=typeof value==='number'&&!Number.isInteger(value)?'#,##0.00########;[Red]-#,##0.00########;0':fmt;
+ }
+ function height(w,r,c,value,span){const available=Array.from({length:span},(_,i)=>w.getColumn(c+i).width).reduce((a,b)=>a+b,0)-3;const lines=String(value?.formula?value.result??'':value??'').split('\n').reduce((n,s)=>n+Math.max(1,Math.ceil(width(s)/available)),0);r.height=Math.min(409,Math.max(r.height||28,lines*16+12));}
+ function band(w,text,kind='section'){
+  const r=w.addRow([]);w.mergeCells(r.number,1,r.number,6);style(r.getCell(1),text,'section');r.getCell(1).font={name:'Microsoft JhengHei',size:kind==='title'?20:kind==='sub'?11:12,bold:true,color:{argb:kind==='sub'?C.ink:C.white}};
+  if(kind==='sub')r.getCell(1).fill={type:'pattern',pattern:'solid',fgColor:{argb:C.light}};
+  r.height=kind==='title'?38:30;height(w,r,1,text,6);return r;
+ }
+ function pair(w,label,value,total=false){const r=w.addRow([]);w.mergeCells(r.number,1,r.number,2);w.mergeCells(r.number,3,r.number,6);style(r.getCell(1),label,total?'total':'label');style(r.getCell(3),value,total?'total':'value');height(w,r,1,label,2);height(w,r,3,value,4);return r;}
+ function chunks(value,budget){if(typeof value!=='string')return [value];const parts=[];let part='',n=0;for(const c of value){const next=c==='\n'?20:width(c);if(n+next>budget&&part){parts.push(part);part='';n=0}part+=c;n+=next}parts.push(part);return parts;}
+ function table(w,values,header=false){const parts=values.map((v,i)=>chunks(v,(w.getColumn(i+1).width-3)*8));let first;for(let j=0;j<Math.max(...parts.map(p=>p.length));j++){const r=w.addRow([]);if(!first)first=r;parts.forEach((p,i)=>{const v=p[j]??'';style(r.getCell(i+1),v,header?'head':'value');height(w,r,i+1,v,1)})}return first;}
+
+ function finish(b){b.eachSheet(w=>{w.pageSetup.printArea=`A1:F${w.rowCount}`});}
+ async function save(b,name){finish(b);const bytes=await b.xlsx.writeBuffer(),url=URL.createObjectURL(new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);}
+ async function run(task){try{return await task()}catch(e){console.error('直式 Excel 匯出失敗',e);alert('Excel 產生失敗：'+e.message)}}
+ const ident=v=>[v.plate||'未填車牌',v.brand,v.model].filter(Boolean).join('　');
+ const date=()=>new Date().toISOString().slice(0,10);
+ function cost(w,v,summary=true){
+  const entries=v.costEntries||[],extra=entries.reduce((n,e)=>n+Number(e.amount||0),0);
+  if(summary){band(w,'車輛資料與成本摘要');[['案件編號',v.caseNo],['車牌',v.plate],['廠牌／車款',`${v.brand||''} ${v.model||''}`],['採購價',Number(v.purchase||0)],['追加成本合計',extra],['車輛總成本',Number(v.total||0)]].forEach(([k,val])=>pair(w,k,val,/合計|總成本/.test(k)));}
+  band(w,'成本明細');table(w,['日期','成本項目／分類','內容／廠商','付款方式','備註','金額'],true);
+  entries.forEach(e=>table(w,[e.date,e.category,e.vendor,e.payment,e.note,Number(e.amount||0)]));
+  if(!entries.length)pair(w,'成本明細','尚無成本明細');
+  band(w,'成本分類小計');const groups=new Map();entries.forEach(e=>{const k=String(e.category||'未分類');groups.set(k,(groups.get(k)||0)+Number(e.amount||0))});groups.forEach((n,k)=>pair(w,k,n));
+  pair(w,'追加成本合計',extra,true);pair(w,'採購價',Number(v.purchase||0));pair(w,'車輛總成本',Number(v.total||0),true);
+  // Preserve every existing joint funding field without an eight-column landscape table.
+  const rows=jointCostRows(v);if(rows.length){band(w,rows[0][0]);const h=rows.findIndex(r=>r[0]==='項目');rows.slice(1,h).forEach(r=>pair(w,r[0],r[1]));rows.slice(h+1).forEach(r=>{band(w,'成本付款核對：'+r[0]);rows[h].slice(1).forEach((label,i)=>pair(w,label,r[i+1]))})}
+ }
+ function index(b,items,title){const w=sheet(b,'索引',title,`共 ${items.length} 筆　匯出日期 ${date()}`);band(w,'車輛索引');items.forEach(({v,name},i)=>{const r=pair(w,`${i+1}　${v.plate||'未填車牌'}`,{text:ident(v),hyperlink:`#'${name.replace(/'/g,"''")}'!A1`});r.getCell(3).font={name:'Microsoft JhengHei',size:11,color:{argb:'FF255B80'},underline:true}});return w;}
+ downloadCostExcel=async function(){return run(async()=>{const v=getSelectedCostVehicle();if(!v)return alert('請先選擇車輛。');const b=book(),w=sheet(b,'車輛成本明細','車輛成本明細表',ident(v));cost(w,v);await save(b,`車輛成本明細_${v.plate}_${date()}.xlsx`)})};
+ downloadSelectedExcel=async function(){return run(async()=>{const list=vehicles.filter(v=>selectedVehicleIds.has(v.id));if(!list.length)return alert('請先勾選要下載的資料。');const b=book(),used=new Set(['索引']),items=list.map(v=>({v,name:integratedSheetName(v.plate||v.caseNo||'車輛',used)}));index(b,items,'車輛進出庫資料');items.forEach(({v,name})=>{const w=sheet(b,name,'車輛進出庫資料',ident(v));band(w,'車籍、成本與出入庫紀錄');vehicleReportRows(v).forEach(([k,val])=>pair(w,k,val,/總成本/.test(k)))});await save(b,`車輛進出庫資料_${date()}.xlsx`)})};
+ downloadSalesWithCostsExcel=async function(){const pairs=integratedExportData();if(!pairs)return;return integratedExportBusy('salesCostExcelButton',async()=>{
+  const b=book(),used=new Set(['索引']),items=pairs.map(p=>({...p,v:p.vehicle,name:integratedSheetName(p.vehicle.plate||p.vehicle.caseNo||'車輛',used)})),iw=index(b,items,'銷售與收款（含成本明細）');
+  // Read the effective original export to keep its exact fields and snapshot amounts.
+  const src=makeIntegratedSalesBook(pairs.map(p=>p.sale)),data=XLSX.utils.sheet_to_json(src.Sheets[src.SheetNames[0]],{header:1,defval:null});
+
+  items.forEach(({v,sale,name},i)=>{
+   const w=sheet(b,name,'銷售與收款（含成本明細）',ident(v)),fields=data[0].map((h,j)=>[h,data[i+1][j]]);
+   const basic=new Set(['年份','廠牌','車款','車牌','新車牌','顏色']);
+   const profit=new Set(['總成本','整台總利潤','公司分攤利潤','同行應結算','實利潤','公司總毛利']);
+   const bonus=new Set(['持有方式','同行車行','公司出資本金','同行出資本金','公司持有%','稅金','業務','本台抽成%','業務獎金','直屬主管','直屬分潤%','直屬分潤',...JOINT_FIELDS.map(r=>r[0])]);
+   band(w,'車輛基本資料');pair(w,'案件編號',v.caseNo);fields.filter(r=>basic.has(r[0])).forEach(r=>pair(w,...r));
+   band(w,'銷售與收款');fields.filter(r=>!basic.has(r[0])&&!bonus.has(r[0])&&!profit.has(r[0])).forEach(r=>pair(w,...r));
+   band(w,'佣金、獎金與利潤資料');fields.filter(r=>bonus.has(r[0])||profit.has(r[0])).forEach(r=>pair(w,r[0],r[1],profit.has(r[0])));
+   [['競賽獎金',sale.contestBonus??sale.settlementSnapshot?.contestBonus??'未記錄（見成本明細）'],['固定成交獎金',Number(sale.fixedBonus||0)],['特殊獎金',Number(sale.specialBonus||0)]].forEach(r=>pair(w,...r));
+   cost(w,v,false);band(w,'成本及利潤合計');pair(w,'車籍總成本',Number(v.total||0),true);fields.filter(r=>profit.has(r[0])).forEach(r=>pair(w,r[0],r[1],true));
+  });await save(b,integratedExportFilename('xlsx'));
+ })};
+ opExcel=async function(preview=false){return run(async()=>{const d=opCapture(preview),b=book(),w=sheet(b,'營業收入損益表','營業收入損益表',d.title);band(w,'營業收入');OP_IN.forEach(k=>pair(w,k,d.bad.includes(k)?'待核對':d.values[k]));band(w,'營業費用');OP_OUT.forEach(k=>pair(w,k,d.bad.includes(k)?'待核對':d.values[k]));band(w,'損益合計');[['營業收入總利潤',d.income],['營業費用總開銷',d.expense],['當月淨利',d.net]].forEach(([k,n])=>pair(w,k,n??'待核對',true));
+  band(w,'來源明細（含待核對及排除項目）');d.details.forEach((r,i)=>{const review=opDetailReview(r);band(w,`${i+1}　${r.source||'來源明細'}`);[['日期／月份',r.date],['來源／關聯單據',r.source],['報表項目',r.item],['認列金額',r.amount??'待核對'],['核對狀態',review.label],['計算過程／排除原因',r.process],['核對說明',review.reasons.join('；')]].forEach(row=>pair(w,...row))});
+  if(d.warnings.length){band(w,'待核對提醒');d.warnings.forEach((text,i)=>pair(w,`提醒 ${i+1}`,text))}await save(b,d.title.replaceAll(' ','_')+'.xlsx');})};
+})();
+
+</script>
 </body>
 </html>
